@@ -30,13 +30,14 @@ Les informations ne seront partagées avec quiconque et resteront d'usage strict
 L'utilisateur a le droit d'accéder, de rectifier, de supprimer ou de limiter l'utilisation de ses informations personnelles. Ces demandes peuvent être adressées à [adresse e-mail de support].
 L'utilisateur peut choisir de ne pas fournir certaines informations, mais cela peut affecter son accès et son utilisation de l'Application.
 
-# 6. Cookies et technologies similaires :
+## 6. Cookies et technologies similaires :
 
 L'Application peut utiliser des cookies et d'autres technologies similaires pour améliorer l'expérience de l'utilisateur.
 
-# 7. Modifications de la politique de confidentialité :
+## 7. Modifications de la politique de confidentialité :
 
 La présente politique de confidentialité peut être modifiée à tout moment. Les utilisateurs seront informés des modifications par le biais de l'Application.
+
 
 
 En utilisant l'Application "CO2 Vehicles", vous consentez à cette politique de confidentialité. Si vous n'acceptez pas ces conditions, veuillez ne pas utiliser l'Application.
