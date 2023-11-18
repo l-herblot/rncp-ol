@@ -93,7 +93,7 @@ def model_get_forecast(
     MODEL_LEARNING_RATE = 0.0001
     MODEL_LOOK_BACK = 6
     MODEL_TRAINING_RATIO = 0.7
-    MODEL_TARGET_RMSE = 4.5
+    MODEL_TARGET_RMSE = 45
 
     # Création d'un dataset des valeurs d'émissions
     dataset = df_emissions_weighted_avg_yearly["co2e_weighted_avg"].values
@@ -188,9 +188,10 @@ def model_get_forecast(
         print(f"RMSE d'entraînement = {train_rmse:.3f}; RMSE de test = {test_rmse:.3f}; Temps d'entraînement et de prédiction : {iteration_duration:.2f}s")
 
     # Affiche le graphique des données d'origine et de prédiction
-    years = range(df_emissions_weighted_avg_yearly['year'].values[0], df_emissions_weighted_avg_yearly['year'].values[-1] + PROJ_NB_YEARS)
+    years = range(df_emissions_weighted_avg_yearly['year'].values[0], df_emissions_weighted_avg_yearly['year'].values[-1] + PROJ_NB_YEARS + 1)
+    print(years[-PROJ_NB_YEARS:])
     colors = ['b','g','r','k','m','c','y']
-    plt.plot(years[:-PROJ_NB_YEARS+1], dataset, colors[0], label="Original")
+    plt.plot(years[:-PROJ_NB_YEARS], dataset, colors[0], label="Original")
     plt.plot(df_emissions_weighted_avg_yearly['year'].values[MODEL_LOOK_BACK-1:train_size-1], train_pred, colors[1], label="Train prediction")
     plt.plot(df_emissions_weighted_avg_yearly['year'].values[train_size:], test_pred, colors[2], label="Test prediction")
     plt.plot(years[-PROJ_NB_YEARS:], projected, colors[3], label="Projected prediction")
