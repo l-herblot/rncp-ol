@@ -1,0 +1,7 @@
+ENVIRONMENT = "dev"
+PG_HOST = 'rncp-ol.postgres.database.azure.com'
+PG_PORT = 5432
+PG_DATABASE = 'rncp_prod'
+PG_USERNAME = 'm2i'
+PG_CONNECT_TIMEOUT = 10
+PG_TABLE_MODELS = "models_tuning"
