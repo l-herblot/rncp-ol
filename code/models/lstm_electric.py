@@ -1,25 +1,27 @@
-# Basic Imports
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
 import time
-from helpers.db_pg2 import *
-from math import sqrt
 
-# Visualization
-import matplotlib.pyplot as plt
+from math import sqrt
+from sklearn.metrics import mean_squared_error
+from helpers.db_pg2 import *
+
+# Tensorflow
+
+# Indique à Tensorflow de ne pas utiliser les optimisations processeur AVX/FMA pour éviter une incompatibilité
+# avec les versions de Tensorflow ne les prenant pas en charge
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+
+# Désactive les opérations personnalisées oneDNN (oneAPI Deep Neural Network Library) pour éviter les erreurs
+# d'arrondis en virgule flottante
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 import tensorflow as tf
 from tensorflow.keras.optimizers import Nadam
 from tensorflow.keras.models import load_model, Model, Sequential
 from tensorflow.keras.layers import Dense, Input, LSTM
-
-# Evaluation
-from sklearn.metrics import mean_squared_error
-
-# Indique à Tensorflow de ne pas utiliser les optimisations processeur AVX/FMA pour éviter une incompatibilité
-# avec les versions de Tensorflow ne les prenant pas en charge
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 # Définition des hyper paramètres du modèle
 MODEL_ACTIVATION_FUNCTION = "relu"
@@ -261,12 +263,10 @@ def get_forecast(year_from, year_to):
 
 if __name__ == "__main__":
     df_energy_sources = data_retrieve()
-    print("data retrieved")
 
     if df_energy_sources is not None:
         #print("df_energy_sources:\n", df_energy_sources)
         df_emissions_weighted_avg_yearly = data_prepare(df_energy_sources)
-        print("data prepared")
         #print("df_emissions_weighted_avg_yearly:\n", df_emissions_weighted_avg_yearly)
 
         #print("\n--- ENTRAINEMENT DU MODELE ---")
