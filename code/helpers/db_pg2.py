@@ -34,8 +34,10 @@ def pg2_disconnect():
 
     if pg2_cursor is not None:
         pg2_cursor.close()
+        pg2_cursor = None
     if pg2_conn is not None:
         pg2_conn.close()
+        pg2_conn = None
 
 
 if pg2_conn is None:
