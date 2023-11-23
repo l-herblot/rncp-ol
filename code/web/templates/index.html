@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="fr">
+    <head>
+        <meta charset="utf-8">
+        <title>CO2e Vehicles - Prédiction des émissions de GES des véhicules</title>
+        <link rel="icon" type="image/x-icon" href="{{ url_for('static',filename='/img/favicon.png') }}">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+        <link rel="stylesheet" href="{{ url_for('static',filename='css/main.css') }}">
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.2/dist/chart.umd.js" integrity="sha384-eI7PSr3L1XLISH8JdDII5YN/njoSsxfbrkCTnJrzXt+ENP5MOVBxD+l6sEG4zoLp" crossorigin="anonymous"></script>
+    </head>
+    <body>
+        <header class="navbar sticky-top bg-dark shadow" data-bs-theme="dark">
+            <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3 text-white" href="#">CO2e Vehicles</a>
+        </header>
+        <div class="container-fluid">
+            <div class="row">
+                <div class="sidebar border border-right col-md-3 col-lg-2 p-0">
+                    <form name="filters" id="filters" method="GET">
+                        <div>
+                            <h2>Véhicule recherché</h2>
+                        </div>
+                        <div class="form-group">
+                            <label for="country">Pays</label>
+                            <select name="country" id="country" class="form-control" onchange="updateData('country');">
+                                {% for cntry_code, cntry in countries.items() %}
+                                <option value="{{cntry_code}}" {% if cntry==country %}selected{% endif %}>{{cntry}}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="make">Marque</label>
+                            <select name="make" id="make" class="form-control" onchange="updateData('make');"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="cn">Modèle</label>
+                            <select name="cn" id="cn" class="form-control" onchange="updateData('cn');"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ft">Carburation</label>
+                            <select name="ft" id="ft" class="form-control" onchange="updateData('ft');"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="year">Année</label>
+                            <select name="year" id="year" class="form-control" onchange="updateData('year');"></select>
+                        </div>
+                    </form>
+                </div>
+                <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                    <div id="vehicle-info" class="row">
+                        <div id="vehicle-thumbnail" class="col">
+                            <img id="vehicle-thumbnail-img" class="img-thumbnail rounded" src="{{ url_for('static',filename='img/car-thumbnail-162x108.png') }}">
+                        </div>
+                        <div id="vehicle-id" class="col">
+                            <h3>Identité</h3>
+                            <p><label for="info-make">Marque: </label><span id="info-make"></span></p>
+                            <p><label for="info-cn">Modèle: </label><span id="info-cn"></span></p>
+                            <p><label for="info-year">Année: </label><span id="info-year"></span></p>
+                            <p><label for="info-country">Pays: </label><span id="info-country"></span></p>
+                        </div>
+                        <div id="vehicle-shape" class="col">
+                            <h3>Morphologie</h3>
+                            <p><label for="info-category">Catégorie: </label><span id="info-category"></span></p>
+                            <p><label for="info-mro">Masse en ordre de marche: </label><span id="info-mro"></span></p>
+                            <p><label for="info-length">Empattement: </label><span id="info-length"></span></p>
+                            <p><label for="info-width">Largeur: </label><span id="info-width"></span></p>
+                        </div>
+                        <div id="vehicle-motor" class="col">
+                            <h3>Motorisation</h3>
+                            <p><label for="info-ft">Carburation: </label><span id="info-ft"></span></p>
+                            <p><label for="info-ec">Cylindrée: </label><span id="info-ec"></span></p>
+                            <p><label for="info-co2e">Emission de GES (thermique): </label><span id="info-co2e"></span></p>
+                            <p><label for="info-z">Consommation électrique: </label><span id="info-z"></span></p>
+                        </div>
+                    </div>
+
+                    <div id="chart">
+                        <canvas class="my-4 w-100" id="chart-canvas" width="800" height="300"></canvas>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </body>
+    <script src="{{ url_for('static',filename='js/main.js') }}"></script>
+    <script>
+        countries_dict = {{countries_dict_str | safe}};
+        fuel_types_dict = {{fuel_types_dict_str | safe}};
+        categories_dict = {{categories_dict_str | safe}};
+    </script>
+</html>

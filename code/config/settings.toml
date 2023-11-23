@@ -4,4 +4,7 @@ PG_PORT = 5432
 PG_DATABASE = 'rncp_prod'
 PG_USERNAME = 'm2i'
 PG_CONNECT_TIMEOUT = 10
+PG_TABLE_VEHICLES = "co2_vehicles_new_clean"
+PG_TABLE_VEHICLES_ELECTRIC = "co2_vehicles_new_clean_electric"
+PG_TABLE_VEHICLES_THERMAL = "co2_vehicles_new_clean_thermal"
 PG_TABLE_MODELS = "models_tuning"

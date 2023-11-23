@@ -17,11 +17,14 @@ pip install -r requirements.txt
 ## Déploiement
 ### Déploiement de l'API
 ```bash
-python api/main.py
+cd api
+uvicorn main:app --reload
 ```
 ### Déploiement de l'interface web
 ```bash
-streamlit run web/main.py
+# Depuis le dossier code/web
+cd web
+flask run
 ```
 ## Structure
 Les dossiers du projet sont organisés comme suit :

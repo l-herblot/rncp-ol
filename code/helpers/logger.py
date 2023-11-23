@@ -26,9 +26,7 @@ class CustomLogger(logging.Logger):
         self,
         name,
         level=logging.NOTSET,
-        logging_path=(
-            str(Path(__file__).absolute().parent.parent / "logs") + path.sep
-        ),
+        logging_path=(str(Path(__file__).absolute().parent.parent / "logs") + path.sep),
     ):
         """The class' constructor.
         Requires a name and, optionally, the minimum level required to log entries, the default
@@ -82,9 +80,7 @@ class CustomLogger(logging.Logger):
         trigger = self._get_trigger()
         _, exception_value, _ = sys.exc_info()
         exception_msg = (
-            f" (Exception : {exception_value})"
-            if exception_value is not None
-            else ""
+            f" (Exception : {exception_value})" if exception_value is not None else ""
         )
 
         # The default _log function is called after all our processing
