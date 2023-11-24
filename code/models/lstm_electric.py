@@ -33,7 +33,8 @@ MODEL_LOOK_BACK = 6
 MODEL_TRAINING_RATIO = 0.7
 # Définition des autres paramètres liés au modèle
 MODEL_TARGET_RMSE = 45
-MODEL_PATH = "../data/models/lstm_electric.keras"
+MODEL_PATH = "../data/models/lstm_electric.h5"
+
 
 def data_prepare(df_energy_sources):
     # Récupère les années uniques
@@ -60,9 +61,7 @@ def data_prepare(df_energy_sources):
         )
 
     # Crée un DataFrame à partir du tableau
-    df_emissions_weighted_avg_yearly = pd.DataFrame(
-        emissions_weighted_avg_yearly
-    )
+    df_emissions_weighted_avg_yearly = pd.DataFrame(emissions_weighted_avg_yearly)
     # Tri le DataFrame par ordre croissant des années
     df_emissions_weighted_avg_yearly.sort_values(by=["year"], inplace=True)
 
@@ -91,10 +90,7 @@ def data_retrieve():
     return df_energy_sources
 
 
-def model_train(
-    df_emissions_weighted_avg_yearly,
-    proj_nb_years=15
-):
+def model_train(df_emissions_weighted_avg_yearly, proj_nb_years=15):
     # Création d'un dataset des valeurs d'émissions
     dataset = df_emissions_weighted_avg_yearly["co2e_weighted_avg"].values
     # Conversion en dataset Tensorflow
@@ -110,22 +106,26 @@ def model_train(
         # Mise-à-jour des variables de monitoring (temps et nombre d'itérations) et affichage
         iteration_start_time = time.time()
         iteration += 1
-        print(f"Iteration #{iteration} (temps écoulé : {time.time() - start_time:.2f}s)")
+        print(
+            f"Iteration #{iteration} (temps écoulé : {time.time() - start_time:.2f}s)"
+        )
 
         # Crée un dataset qui soit une suite de séries temporelles de taille maximale MODEL_LOOK_BACK+1
         # Chaque série est décalée (shifted) d'un cran par rapport à la précédente
-        tf_windows = tf_dataset.window(MODEL_LOOK_BACK+1, shift=1)
+        tf_windows = tf_dataset.window(MODEL_LOOK_BACK + 1, shift=1)
 
         # Uniformise les séries afin de ne conserver que les séries entières (de taille MODEL_LOOK_BACK+1)
-        dataset_windowed = tf_windows.flat_map(lambda x: x.batch(MODEL_LOOK_BACK+1, drop_remainder=True)) #.take(len(dataset))
+        dataset_windowed = tf_windows.flat_map(
+            lambda x: x.batch(MODEL_LOOK_BACK + 1, drop_remainder=True)
+        )  # .take(len(dataset))
 
         # Calcule la taille du tableau de données d'entraînement
-        train_size = round(len(dataset)*MODEL_TRAINING_RATIO)
+        train_size = round(len(dataset) * MODEL_TRAINING_RATIO)
         # Construction des tableaux de données d'entraînement et de test
         train = []
         test = []
         for index, series in enumerate(dataset_windowed):
-            if index < train_size-MODEL_LOOK_BACK:
+            if index < train_size - MODEL_LOOK_BACK:
                 train.append(series.numpy())
             else:
                 test.append(series.numpy())
@@ -144,7 +144,9 @@ def model_train(
 
         # Création du modèle LSTM simple à MODEL_HIDDEN_LAYERS couches
         input_tensor = Input(shape=(train_X.shape[1], train_X.shape[2]))
-        lstm_layer = LSTM(MODEL_HIDDEN_LAYERS, activation=MODEL_ACTIVATION_FUNCTION)(input_tensor)
+        lstm_layer = LSTM(MODEL_HIDDEN_LAYERS, activation=MODEL_ACTIVATION_FUNCTION)(
+            input_tensor
+        )
         output_tensor = Dense(1)(lstm_layer)
         model = Model(input_tensor, output_tensor)
         m_optimizer = Nadam(learning_rate=MODEL_LEARNING_RATE)
@@ -154,7 +156,15 @@ def model_train(
 
         # Entraînement du modèle sur MODEL_EPOCHS époques avec les données
         # de test comme données de validation pour évaluer le taux d'erreur
-        model.fit(train_X, train_y, epochs=MODEL_EPOCHS, batch_size=MODEL_BATCH_SIZE, validation_data=(test_X, test_y), verbose=0, shuffle=False)
+        model.fit(
+            train_X,
+            train_y,
+            epochs=MODEL_EPOCHS,
+            batch_size=MODEL_BATCH_SIZE,
+            validation_data=(test_X, test_y),
+            verbose=0,
+            shuffle=False,
+        )
 
         # Prédiction des données d'entraînement
         train_pred = model.predict(train_X, verbose=0)
@@ -165,16 +175,18 @@ def model_train(
         # A ceci près que l'on décale les prédictions d'un cran vers la "gauche" (l'année précédente)
         # pour les faire correspondre aux données de sortie
         test_pred_length = len(test_pred)
-        for index in range(test_pred_length-1):
-            test_pred[index] = test_pred[index+1]
+        for index in range(test_pred_length - 1):
+            test_pred[index] = test_pred[index + 1]
 
         # Construction du dataset de données d'entrée pour les projections
         projected = dataset[-MODEL_LOOK_BACK:]
 
         # Prédiction des projections (une année après l'autre puisque la prédiction pour une année est dépendante
         # des valeurs d'émissions des MODEL_LOOK_BACK années précédentes)
-        for i in range(1, proj_nb_years+1):
-            local_pred = model.predict(np.array([[projected[-MODEL_LOOK_BACK:]]]), verbose=0)
+        for i in range(1, proj_nb_years + 1):
+            local_pred = model.predict(
+                np.array([[projected[-MODEL_LOOK_BACK:]]]), verbose=0
+            )
             projected = np.append(projected, [local_pred[0][0]], axis=0)
             # Supprime au fur et à mesure du tableau des prédictions les PROJ_LOOK_BACK premiers éléments
             if i <= MODEL_LOOK_BACK:
@@ -183,18 +195,35 @@ def model_train(
         # Calcule et affiche les erreurs moyennes et la durée de l'itération
         train_rmse = sqrt(mean_squared_error(train[1:, -1], train_pred[:-1]))
         test_rmse = sqrt(mean_squared_error(test[:, -1], test_pred))
-        iteration_duration = time.time()-iteration_start_time
-        print(f"RMSE d'entraînement = {train_rmse:.3f}; RMSE de test = {test_rmse:.3f}; Temps d'entraînement et de prédiction : {iteration_duration:.2f}s")
+        iteration_duration = time.time() - iteration_start_time
+        print(
+            f"RMSE d'entraînement = {train_rmse:.3f}; RMSE de test = {test_rmse:.3f}; Temps d'entraînement et de prédiction : {iteration_duration:.2f}s"
+        )
 
     # Affiche le graphique des données d'origine et de prédiction
-    years = range(df_emissions_weighted_avg_yearly['year'].values[0], df_emissions_weighted_avg_yearly['year'].values[-1] + proj_nb_years + 1)
+    years = range(
+        df_emissions_weighted_avg_yearly["year"].values[0],
+        df_emissions_weighted_avg_yearly["year"].values[-1] + proj_nb_years + 1,
+    )
     print(years[-proj_nb_years:])
-    colors = ['b','g','r','k','m','c','y']
+    colors = ["b", "g", "r", "k", "m", "c", "y"]
     plt.plot(years[:-proj_nb_years], dataset, colors[0], label="Original")
-    plt.plot(df_emissions_weighted_avg_yearly['year'].values[MODEL_LOOK_BACK-1:train_size-1], train_pred, colors[1], label="Train prediction")
-    plt.plot(df_emissions_weighted_avg_yearly['year'].values[train_size:], test_pred, colors[2], label="Test prediction")
+    plt.plot(
+        df_emissions_weighted_avg_yearly["year"].values[
+            MODEL_LOOK_BACK - 1 : train_size - 1
+        ],
+        train_pred,
+        colors[1],
+        label="Train prediction",
+    )
+    plt.plot(
+        df_emissions_weighted_avg_yearly["year"].values[train_size:],
+        test_pred,
+        colors[2],
+        label="Test prediction",
+    )
     plt.plot(years[-proj_nb_years:], projected, colors[3], label="Projected prediction")
-    plt.xlim(years[0]-1, years[-1]+1)
+    plt.xlim(years[0] - 1, years[-1] + 1)
     plt.show()
 
     # Enregistre le modèle sous le format Keras (préconisé) et H5 (pour la rétrocompatibilité)
@@ -204,6 +233,7 @@ def model_train(
     # Retourne les projections sous la forme d'un dictionnaire {année: valeur}
     return dict(zip(years[-proj_nb_years:], projected))
 
+
 def model_get_forecast(df_emissions_weighted_avg_yearly, year_from, year_to):
     # Création d'un dataset des valeurs d'émissions et d'un autre avec les années
     dataset = df_emissions_weighted_avg_yearly["co2e_weighted_avg"].values
@@ -211,14 +241,20 @@ def model_get_forecast(df_emissions_weighted_avg_yearly, year_from, year_to):
 
     # Vérification de la validité des années
     if year_from < df_years[0]:
-        return {"error": f"La date de départ fournie ({year_from}) est inférieure à la plus petite date dans la base de données ({df_years[0]})"}
+        return {
+            "error": f"La date de départ fournie ({year_from}) est inférieure à la plus petite date dans la base de données ({df_years[0]})"
+        }
     if year_to < year_from:
-        return {"error": f"La date de fin fournie ({year_to}) est inférieure à la date de départ ({year_from})"}
+        return {
+            "error": f"La date de fin fournie ({year_to}) est inférieure à la date de départ ({year_from})"
+        }
     if year_to > df_years[-1] + 30:
-        return {"error": f"Le modèle ne peut fournir de projection au-delà de {df_years[-1]+30}, or la date de fin fournie est {year_to}"}
+        return {
+            "error": f"Le modèle ne peut fournir de projection au-delà de {df_years[-1]+30}, or la date de fin fournie est {year_to}"
+        }
 
     # Vérification de l'existence du fichier contenant le modèle
-    #print(os.path.abspath(MODEL_PATH))
+    # print(os.path.abspath(MODEL_PATH))
     if os.path.isfile(MODEL_PATH) is False:
         return {"error": "Le fichier de modèle entraîné n'existe pas"}
 
@@ -226,54 +262,69 @@ def model_get_forecast(df_emissions_weighted_avg_yearly, year_from, year_to):
     model = load_model(MODEL_PATH)
 
     # Construction du dataset de données d'entrée pour les projections
-    projected = dataset[:] #[-MODEL_LOOK_BACK:]
+    projected = dataset[:]  # [-MODEL_LOOK_BACK:]
 
     # Prédiction des projections (une année après l'autre puisque la prédiction pour une année est dépendante
     # des valeurs d'émissions des MODEL_LOOK_BACK années précédentes)
     if year_to > df_years[-1]:
         for i in range(1, year_to - df_years[-1] + 1):
-            local_pred = model.predict(np.array([[projected[-MODEL_LOOK_BACK:]]]), verbose=0)
+            local_pred = model.predict(
+                np.array([[projected[-MODEL_LOOK_BACK:]]]), verbose=0
+            )
             projected = np.append(projected, [local_pred[0][0]], axis=0)
 
     # Création des tableaux des projections (années et valeurs)
-    years = range(df_years[0], df_years[-1] + (year_to - df_years[-1 if year_to > df_years[-1] else 0]) + 1)
+    years = range(
+        df_years[0],
+        df_years[-1] + (year_to - df_years[-1 if year_to > df_years[-1] else 0]) + 1,
+    )
     projected_years = [year for year in years if year_from <= year <= year_to]
-    projected_values = [value for year, value in zip(years, projected) if year_from <= year <= year_to]
+    projected_values = [
+        value for year, value in zip(years, projected) if year_from <= year <= year_to
+    ]
 
     # Affiche le graphique des données d'origine et de prédiction
-    #colors = ['b', 'g', 'r', 'k', 'm', 'c', 'y']
-    #plt.plot(years[:len(dataset)], dataset, colors[0], label="Original")
-    #plt.plot(projected_years, projected_values, colors[1], label="Projected prediction")
-    #plt.xlim(years[0] - 1, years[-1] + 1)
-    #plt.show()
+    # colors = ['b', 'g', 'r', 'k', 'm', 'c', 'y']
+    # plt.plot(years[:len(dataset)], dataset, colors[0], label="Original")
+    # plt.plot(projected_years, projected_values, colors[1], label="Projected prediction")
+    # plt.xlim(years[0] - 1, years[-1] + 1)
+    # plt.show()
 
     # Retourne les projections sous la forme d'un dictionnaire {année: valeur}
     return dict(zip(projected_years, projected_values))
+
 
 def get_forecast(year_from, year_to):
     df_energy_sources = data_retrieve()
 
     if df_energy_sources is not None:
         df_emissions_weighted_avg_yearly = data_prepare(df_energy_sources)
-        forecast = model_get_forecast(df_emissions_weighted_avg_yearly, year_from, year_to)
+        forecast = model_get_forecast(
+            df_emissions_weighted_avg_yearly, year_from, year_to
+        )
     else:
-        forecast = {"error": "Impossible de récupérer les données nécessaires à la prédiction des projections dans la base de données"}
+        forecast = {
+            "error": "Impossible de récupérer les données nécessaires à la prédiction des projections dans la base de données"
+        }
 
     return forecast
 
+
 if __name__ == "__main__":
+    print(get_forecast(2025, 2025))
+    exit(1)
     df_energy_sources = data_retrieve()
 
     if df_energy_sources is not None:
-        #print("df_energy_sources:\n", df_energy_sources)
+        # print("df_energy_sources:\n", df_energy_sources)
         df_emissions_weighted_avg_yearly = data_prepare(df_energy_sources)
-        #print("df_emissions_weighted_avg_yearly:\n", df_emissions_weighted_avg_yearly)
+        # print("df_emissions_weighted_avg_yearly:\n", df_emissions_weighted_avg_yearly)
 
-        #print("\n--- ENTRAINEMENT DU MODELE ---")
-        #forecast = model_train(df_emissions_weighted_avg_yearly, 15)
+        # print("\n--- ENTRAINEMENT DU MODELE ---")
+        forecast = model_train(df_emissions_weighted_avg_yearly, 15)
 
         print("\n--- RESULTATS DE LA PROJECTION ---")
-        #print(forecast)
-        print(model_get_forecast(df_emissions_weighted_avg_yearly, 2024, 2036))
+        # print(forecast)
+        # print(model_get_forecast(df_emissions_weighted_avg_yearly, 2024, 2036))
 
     pg2_disconnect()
