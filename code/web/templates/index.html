@@ -71,6 +71,7 @@
                             <p><label for="info-ec">Cylindrée: </label><span id="info-ec"></span></p>
                             <p><label for="info-co2e">Emission de GES (thermique): </label><span id="info-co2e"></span></p>
                             <p><label for="info-z">Consommation électrique: </label><span id="info-z"></span></p>
+                            <p><img id="ecoscore" src="{{ url_for('static',filename='img/ecoscore-none.png') }}"></p>
                         </div>
                     </div>
 
@@ -81,10 +82,18 @@
             </div>
         </div>
     </body>
-    <script src="{{ url_for('static',filename='js/main.js') }}"></script>
     <script>
         countries_dict = {{countries_dict_str | safe}};
         fuel_types_dict = {{fuel_types_dict_str | safe}};
         categories_dict = {{categories_dict_str | safe}};
+        server_ip_address = '{{server_ip_address | safe}}';
+        let client_ip_address = '127.0.0.1';
+        fetch('https://api.ipify.org/?format=json')
+            .then(response => response.json())
+            .then((json) => {
+                if(json.ip) client_ip_address = json.ip;
+                else console.log("Unable to get client's public IP address")
+            });
     </script>
+    <script src="{{ url_for('static',filename='js/main.js') }}"></script>
 </html>

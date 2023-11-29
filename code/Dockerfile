@@ -47,17 +47,9 @@ COPY . .
 # Expose the port that the web application listens on.
 EXPOSE 5000
 
-# Run the application.
-#WORKDIR ./web
-#ENV FLASK_APP=app.py
-#CMD ["flask", "run", "--host=0.0.0.0"]
-
 # Expose the port that the API listens on.
 EXPOSE 8000
 EXPOSE 80
 
-# Run the application.
-#WORKDIR ../api
-#CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-CMD ["sh", "-c", "cd web && flask run --host=0.0.0.0 --port 80 & cd api && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"]
+# Run the application
+CMD ["sh", "-c", "cd web && flask run --host=0.0.0.0 --port 80 & cd api && uvicorn main:app --host 0.0.0.0 --port 8000"]

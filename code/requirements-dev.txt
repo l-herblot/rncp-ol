@@ -5,6 +5,7 @@ beautifulsoup4 == 4.11.*
 dynaconf == 3.*
 fastapi == 0.104.1
 flask == 3.0.0
+kaleido == 0.2.1
 matplotlib == 3.8.1
 numpy == 1.26.0
 pandas == 2.1.3

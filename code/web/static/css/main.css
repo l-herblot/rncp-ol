@@ -1,5 +1,13 @@
+div.container-fluid{
+    height: 100%;
+    position: fixed;
+}
+div.container-fluid>div.row{
+    height: 100%;
+}
 div.sidebar{
     background-color: #0001;
+    height: 100%;
 }
 
 div.sidebar>form, #vehicle-info{
@@ -18,9 +26,13 @@ div.sidebar>form, #vehicle-info{
     font-weight: bold;
 }
 
+#ecoscore{
+    width: 100%;
+}
+
 #vehicle-thumbnail{
     display: flex;
-  justify-content: center;
+    justify-content: center;
 }
 
 #vehicle-thumbnail .spinner-grow{
@@ -30,5 +42,5 @@ div.sidebar>form, #vehicle-info{
 #vehicle-thumbnail>img{
     display: block;
     height: 180px;
-    margin: auto;
+    margin: 0.5em auto;
 }

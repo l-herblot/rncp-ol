@@ -4,6 +4,7 @@ import pandas as pd
 from flask import Flask, render_template, request
 
 from helpers.data import categories_dict, countries_dict, fuel_types_dict
+from helpers.network import get_public_ip
 
 app = Flask("co2e")
 
@@ -25,6 +26,7 @@ def index():
 
     return render_template(
         "index.html",
+        server_ip_address=get_public_ip(),
         countries=countries_dict,
         countries_dict_str="{"
         + ",".join(

@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.data import router_data
 from api.forecast_electric import router_forecast_electric
 
+from helpers.network import get_public_ip
+
 app = FastAPI(
     title="CO2 vehicles",
     description="CO2 vehicles vous informe sur les émissions des véhicules européens",
@@ -24,9 +26,11 @@ app = FastAPI(
 
 origins = [
     "http://localhost",
+    "http://localhost:80",
     "http://localhost:5000",
-    "http://localhost:5000/",
-    "http://127.0.0.1:5000",
+    f"http://{get_public_ip()}",
+    f"http://{get_public_ip()}:80",
+    f"http://{get_public_ip()}:5000",
 ]
 
 app.add_middleware(

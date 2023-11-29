@@ -6,7 +6,7 @@ function updateChart(co2e, z){
     const chart_height = document.getElementById("chart-canvas").height;
     const chart_width = document.getElementById("chart-canvas").width;
     document.getElementById("chart").innerHTML = '<div class="spinner-grow text-primary" role="status" height="' + chart_height + '" width="' + chart_width + '"><div class="sr-only"></div></div>'
-    fetch("http://127.0.0.1:8000/forecast?year_from=" + year_from + "&year_to=" + year_to,{
+    fetch("http://" + (server_ip_address != client_ip_address ? server_ip_address : "localhost") + ":8000/forecast?year_from=" + year_from + "&year_to=" + year_to,{
             headers : {'Content-Type': 'application/json', 'Accept': 'application/json'}
         })
         .then((response) => {
@@ -70,7 +70,7 @@ function updateChart(co2e, z){
 }
 
 function updateData(caller, from_onclick=false){
-    fetch("http://127.0.0.1:8000/data?caller=" + caller
+    fetch("http://" + (server_ip_address != client_ip_address ? server_ip_address : "localhost") + ":8000/data?caller=" + caller
         + "&country=" + document.getElementById("country").value
         + "&make=" + document.getElementById("make").value
         + "&cn=" + document.getElementById("cn").value
@@ -155,6 +155,19 @@ function updateData(caller, from_onclick=false){
                     document.getElementById("info-ec").innerHTML = vehicle[5]?" " + vehicle[5] + " cm<sup>3</sup>":" N/C";
                     document.getElementById("info-co2e").innerHTML = vehicle[2]?" " + vehicle[2] + " g/km":" N/C";
                     document.getElementById("info-z").innerHTML = vehicle[6]?" " + vehicle[6] + " Wh/km":" N/C";
+                    let ecoscore = "none";
+                    let ges = vehicle[2] + (263 * vehicle[6] / 1000);
+                    if(ges < 50)
+                        ecoscore = "a";
+                    else if(ges < 100)
+                        ecoscore = "b";
+                    else if(ges < 150)
+                        ecoscore = "c";
+                    else if(ges < 200)
+                        ecoscore = "d";
+                    else if(ges >= 200)
+                        ecoscore = "e";
+                    document.getElementById("ecoscore").src = "static/img/ecoscore-" + ecoscore + ".png";
                     updateThumbnail();
                     updateChart(vehicle[2], vehicle[6]);
             }
@@ -171,7 +184,7 @@ function updateThumbnail(){
     const cn = document.getElementById("cn").value;
     const year = document.getElementById("year").value;
     document.getElementById("vehicle-thumbnail").innerHTML = '<div class="spinner-grow text-primary" role="status"><span class="sr-only"></span></div>'
-    fetch("http://127.0.0.1:8000/data/thumbnail?vehicle=" + make + " " + cn + " " + year,{
+    fetch("http://" + (server_ip_address != client_ip_address ? server_ip_address : "localhost") + ":8000/data/thumbnail?vehicle=" + make + " " + cn + " " + year,{
             headers : {'Content-Type': 'application/json', 'Accept': 'application/json'}
         })
         .then((response) => {
