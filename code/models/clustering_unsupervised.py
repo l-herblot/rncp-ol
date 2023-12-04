@@ -125,7 +125,7 @@ def test_model(
             # Entraînement du modèle
             model.fit(model_input)
             # Récupèration des résultats de prédictions (étiquettes de cluster) pour chaque échantillon
-            y = model.predict(model_input)
+            out = model.predict(model_input)
     elif model_type in [
         "AgglomerativeClustering",
         "DBSCAN",
@@ -136,13 +136,13 @@ def test_model(
         # Ignore les avertissements indiquant que le modèle n'a pas pu converger
         with ignore_warnings(category=ConvergenceWarning):
             # Entraînement du modèle et récupèration les résultats de prédictions (étiquettes de cluster) pour chaque échantillon
-            y = model.fit_predict(model_input)
+            out = model.fit_predict(model_input)
 
     # Calcul du temps écoulé pour l'entraînement du modèle
     duration = (time_ns() - time_start) / 10**9
 
     # Récupération des clusters
-    clusters = unique(y)
+    clusters = unique(out)
 
     plot_filename = (
         dirname(abspath(__file__)) + f"/../tmp/models/{model_type}_{time()}.png"
@@ -152,20 +152,27 @@ def test_model(
     params_str = "; ".join([k + ":" + str(v) for k, v in model_params.items()])
     pg2_cursor.execute(
         f"INSERT INTO {settings['PG_TABLE_MODELS_CLUSTERING_UNSUPERVISED']} VALUES(DEFAULT, '{model_type}', '{query_select}', "
-        f"'{str(len(y))}', '{params_str}', {duration:.3f}, '{plot_filename}', 'num_clusters:{len(clusters)}')"
+        f"'{str(len(out))}', '{params_str}', {duration:.3f}, '{plot_filename}', 'num_clusters:{len(clusters)}')"
     )
     pg2_conn.commit()
 
-    df_plot_ready = pd.concat([model_input, pd.DataFrame(y)], axis=1)
-    df_plot_ready.columns = [features[0], features[1], "z"]
+    # Création du dataframe final (résultant des "features" et de la prédiction)
+    df_plot_ready = pd.concat([model_input, pd.DataFrame(out)], axis=1)
+    columns = [feature for feature in features]
+    columns.append("out")
+    df_plot_ready.columns = columns
+
     # Affichage du graphique
     fig = px.scatter(
         data_frame=df_plot_ready,
         x=features[0],
         y=features[1],
-        color="z",
+        color=features[2] if len(features) > 2 else None,
+        symbol="out",
         title=model_type + " avec " + params_str,
     )
+    fig.update_xaxes(range=[0, 5000])
+    fig.update_yaxes(range=[0, 7000])
     fig.write_image(plot_filename)
     fig.show()
 
@@ -183,14 +190,25 @@ def plot_against(query):
     X = []
     y = []
 
+    features = query[len("SELECT ") - 1 : query.find("FROM")].split(",")
     for r in pg2_cursor.fetchall():
-        X.append([r[0], r[1]])
-        y.append(r[2])
+        X.append([r[f] for f in range(len(features) - 1)])
+        y.append(r[len(features) - 1])
     X = pd.DataFrame(X).fillna(0)
-    y = np.array(y)
+    out = np.array(y)
 
     # Création du nuage de points
-    fig = px.scatter(x=X[0], y=X[1], color=y, title=query[: query.find("FROM")])
+    fig = px.scatter(
+        x=X[0],
+        y=X[1],
+        color=X[2] if len(features) - 1 > 2 else None,
+        symbol=out,
+        title=",".join(features[: len(features) - 1])
+        + " vs "
+        + features[len(features) - 1],
+    )
+    fig.update_xaxes(range=[0, 5000])
+    fig.update_yaxes(range=[0, 7000])
     fig.show()
 
 
@@ -382,21 +400,29 @@ test_model_list = [
     },
 ]
 
-# test_model_list = {}
+# test_model_list = []
+
+test_model_list = [
+    {
+        "model": "GaussianMixture",
+        "params": {"n_components": 2},
+        "max_samples": 0,
+    },
+]
 
 label_encoders = {}
 
 if __name__ == "__main__":
     create_logging_table()
 
-    """run_tests(
+    run_tests(
         test_model_list,
-        "CO2e, EC",
-        "CO2e IS NOT NULL AND EC IS NOT NULL",
-        f"SELECT CO2e, EC, (CASE WHEN MRO<1000 THEN 'A' WHEN MRO<1500 THEN 'B' WHEN MRO>2500 THEN 'E' END) ges FROM {settings['PG_TABLE_VEHICLES']} WHERE CO2e IS NOT NULL AND EC IS NOT NULL AND (MRO <1500 OR MRO>2500)",
-    )"""
+        "MRO, Length, Width",
+        "MRO IS NOT NULL AND Length IS NOT NULL AND Width IS NOT NULL AND (Width<1500 OR Width>2500)",
+        f"SELECT MRO, Length, Width, Category FROM {settings['PG_TABLE_VEHICLES']} WHERE MRO IS NOT NULL AND Length IS NOT NULL AND Width IS NOT NULL AND (Width<1500 OR Width>2500) AND Category IN('M1', 'N1')",
+    )
     # f"SELECT CO2e, EC, Make FROM {settings['PG_TABLE_VEHICLES']} WHERE EC IS NOT NULL AND EC>0 AND Make IN('MERCEDES-BENZ', 'VOLKSWAGEN', 'BMW', 'AUDI', 'FORD', 'RENAULT', 'SKODA', 'SEAT', 'OPEL', 'PEUGEOT')"
     # f"SELECT CO2e, EC, (CASE WHEN MRO<1000 THEN 'A' WHEN MRO<1500 THEN 'B' WHEN MRO>2500 THEN 'E' END) Mass FROM {settings['PG_TABLE_VEHICLES']} WHERE EC IS NOT NULL AND EC>0 AND (MRO<1500 OR MRO>2500)"
     # f"SELECT CO2e, MRO, (CASE WHEN EC<1000 THEN 'A' WHEN EC<1500 THEN 'B' WHEN EC<2000 THEN 'C' WHEN EC <2500 THEN 'D' ELSE 'E' END) capacity FROM {settings['PG_TABLE_VEHICLES']}_thermal WHERE CO2e IS NOT NULL AND MRO IS NOT NULL AND CO2e>100"
 
-    run_gm_co2e_ec_mro()
+    # run_gm_co2e_ec_mro()
