@@ -17,6 +17,7 @@ from sklearn.cluster import (
     SpectralClustering,
 )
 from sklearn.exceptions import ConvergenceWarning
+from sklearn.metrics import classification_report
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils._testing import ignore_warnings
@@ -24,6 +25,11 @@ from time import time, time_ns
 
 from config.settings import settings
 from helpers.db_pg2 import pg2_conn, pg2_cursor
+
+# Ignore les avertissements indiquant que le modèle n'a pas pu converger
+ignore_warnings(category=ConvergenceWarning)
+ignore_warnings(category=RuntimeWarning)
+ignore_warnings(category=UserWarning)
 
 
 def create_logging_table():
@@ -120,12 +126,14 @@ def test_model(
         "KMeans",
         "MiniBatchKMeans",
     ]:
-        # Ignore les avertissements indiquant que le modèle n'a pas pu converger
-        with ignore_warnings(category=ConvergenceWarning):
-            # Entraînement du modèle
-            model.fit(model_input)
-            # Récupèration des résultats de prédictions (étiquettes de cluster) pour chaque échantillon
-            out = model.predict(model_input)
+        # Entraînement du modèle
+        model.fit(model_input)
+        # Récupèration des résultats de prédictions (étiquettes de cluster) pour chaque échantillon
+        out = (
+            1 - model.predict(model_input)
+            if model_type in ("GaussianMixture", "BIRCH")
+            else model.predict(model_input)
+        )
     elif model_type in [
         "AgglomerativeClustering",
         "DBSCAN",
@@ -133,13 +141,27 @@ def test_model(
         "OPTICS",
         "SpectralClustering",
     ]:
-        # Ignore les avertissements indiquant que le modèle n'a pas pu converger
-        with ignore_warnings(category=ConvergenceWarning):
-            # Entraînement du modèle et récupèration les résultats de prédictions (étiquettes de cluster) pour chaque échantillon
-            out = model.fit_predict(model_input)
+        # Entraînement du modèle et récupèration les résultats de prédictions (étiquettes de cluster) pour chaque échantillon
+        out = model.fit_predict(model_input)
 
     # Calcul du temps écoulé pour l'entraînement du modèle
     duration = (time_ns() - time_start) / 10**9
+
+    report = classification_report(
+        model_input.iloc[:, model_input.columns.get_loc(model_input.columns[-1])],
+        out,
+        output_dict=True,
+        zero_division=1,
+    )
+    print(
+        f"Pour {model_type}:",
+        "Accuracy =",
+        report["accuracy"],
+        "\nMacro average =",
+        report["macro avg"],
+        "\nWeighted average :",
+        report["weighted avg"],
+    )
 
     # Récupération des clusters
     clusters = unique(out)
@@ -167,14 +189,16 @@ def test_model(
         data_frame=df_plot_ready,
         x=features[0],
         y=features[1],
-        color=features[2] if len(features) > 2 else None,
-        symbol="out",
+        color=features[2] if len(features) - 1 > 2 else out,
+        symbol=out if len(features) - 1 > 2 else None,
         title=model_type + " avec " + params_str,
     )
-    fig.update_xaxes(range=[0, 5000])
+    fig.update_xaxes(range=[0, 1000])
     fig.update_yaxes(range=[0, 7000])
     fig.write_image(plot_filename)
     fig.show()
+
+    return report["accuracy"], report["macro avg"]["f1-score"]
 
 
 #
@@ -201,13 +225,13 @@ def plot_against(query):
     fig = px.scatter(
         x=X[0],
         y=X[1],
-        color=X[2] if len(features) - 1 > 2 else None,
-        symbol=out,
+        color=X[2] if len(features) - 1 > 2 else out,
+        symbol=out if len(features) - 1 > 2 else None,
         title=",".join(features[: len(features) - 1])
         + " vs "
         + features[len(features) - 1],
     )
-    fig.update_xaxes(range=[0, 5000])
+    fig.update_xaxes(range=[0, 1000])
     fig.update_yaxes(range=[0, 7000])
     fig.show()
 
@@ -221,16 +245,25 @@ def run_tests(model_list, query_select, query_where, query_plot_against):
     :param query_plot_against: la requête SQL de récupération des données à afficher dans le graphique
     :return:
     """
+    best_model = ""
+    max_f1_score = 0
     for test in model_list:
-        test_model(
+        accuracy, f1_score = test_model(
             query_select,
             query_where,
             test["max_samples"],
             test["model"],
             **test["params"],
         )
+        if f1_score > max_f1_score:
+            max_f1_score = f1_score
+            best_model = test["model"]
 
     plot_against(query_plot_against)
+
+    print(
+        f"Le meilleur modèle semble être {best_model} avec une exactitude de {accuracy}"
+    )
 
 
 def run_gm_co2e_ec_mro():
@@ -252,16 +285,15 @@ def run_gm_co2e_ec_mro():
     # Définition du modèle
     model = GaussianMixture(n_components=2, random_state=33)
 
-    # Ignore les avertissements indiquant que le modèle n'a pas pu converger
-    with ignore_warnings(category=ConvergenceWarning):
-        # Entraînement du modèle
-        model.fit(model_input)
-        # Récupèration des résultats de prédictions (étiquettes de cluster) pour chaque échantillon
-        y = model.predict(model_input)
+    # Entraînement du modèle
+    model.fit(model_input[["CO2e", "EC"]])
+    # Récupèration des résultats de prédictions (étiquettes de cluster) pour chaque échantillon
+    y = 1 - model.predict(model_input[["CO2e", "EC"]])
 
     # Création du dataframe final incluant les colonnes d'entrée et de résultat
     df_plot_ready = pd.concat([model_input, pd.DataFrame(y)], axis=1)
     df_plot_ready.columns = ["CO2e", "EC", "Masse", "Cluster"]
+    print(df_plot_ready)
 
     # Comptage des erreurs et ajout de la colonne "Prédiction" qui permet de savoir si la prédiction a été un succès ou un échec
     error_count = 0
@@ -332,6 +364,7 @@ def run_gm_co2e_ec_mro():
         x="CO2e",
         y="EC",
         color="Prédiction",
+        color_discrete_sequence=px.colors.qualitative.Set1,
         title=f"Comparaison des prédictions avec les valeurs réelles (taux d'erreur de {error_count/len(df_plot_ready)*100:.2f}%)",
     )
     fig.show()
@@ -402,27 +435,27 @@ test_model_list = [
 
 # test_model_list = []
 
-test_model_list = [
+"""test_model_list = [
     {
         "model": "GaussianMixture",
         "params": {"n_components": 2},
         "max_samples": 0,
     },
-]
+]"""
 
 label_encoders = {}
 
 if __name__ == "__main__":
     create_logging_table()
 
-    run_tests(
+    """run_tests(
         test_model_list,
-        "MRO, Length, Width",
-        "MRO IS NOT NULL AND Length IS NOT NULL AND Width IS NOT NULL AND (Width<1500 OR Width>2500)",
-        f"SELECT MRO, Length, Width, Category FROM {settings['PG_TABLE_VEHICLES']} WHERE MRO IS NOT NULL AND Length IS NOT NULL AND Width IS NOT NULL AND (Width<1500 OR Width>2500) AND Category IN('M1', 'N1')",
-    )
+        "CO2e, EC, (CASE WHEN MRO<1500 THEN 0 ELSE 1 END) Masse",
+        "CO2e IS NOT NULL AND EC IS NOT NULL AND (MRO<1500 OR MRO>2500)",
+        f"SELECT CO2e, EC, (CASE WHEN MRO<1500 THEN 0 ELSE 1 END) Masse FROM {settings['PG_TABLE_VEHICLES']} WHERE CO2e IS NOT NULL AND EC IS NOT NULL AND (MRO<1500 OR MRO>2500);",
+    )"""
     # f"SELECT CO2e, EC, Make FROM {settings['PG_TABLE_VEHICLES']} WHERE EC IS NOT NULL AND EC>0 AND Make IN('MERCEDES-BENZ', 'VOLKSWAGEN', 'BMW', 'AUDI', 'FORD', 'RENAULT', 'SKODA', 'SEAT', 'OPEL', 'PEUGEOT')"
     # f"SELECT CO2e, EC, (CASE WHEN MRO<1000 THEN 'A' WHEN MRO<1500 THEN 'B' WHEN MRO>2500 THEN 'E' END) Mass FROM {settings['PG_TABLE_VEHICLES']} WHERE EC IS NOT NULL AND EC>0 AND (MRO<1500 OR MRO>2500)"
     # f"SELECT CO2e, MRO, (CASE WHEN EC<1000 THEN 'A' WHEN EC<1500 THEN 'B' WHEN EC<2000 THEN 'C' WHEN EC <2500 THEN 'D' ELSE 'E' END) capacity FROM {settings['PG_TABLE_VEHICLES']}_thermal WHERE CO2e IS NOT NULL AND MRO IS NOT NULL AND CO2e>100"
 
-    # run_gm_co2e_ec_mro()
+    run_gm_co2e_ec_mro()

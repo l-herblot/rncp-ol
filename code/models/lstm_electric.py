@@ -5,6 +5,7 @@ import pandas as pd
 import time
 
 from math import sqrt
+from scipy.stats import pearsonr
 from sklearn.metrics import mean_squared_error
 from helpers.db_pg2 import *
 
@@ -272,6 +273,8 @@ def model_get_forecast(df_emissions_weighted_avg_yearly, year_from, year_to):
                 np.array([[projected[-MODEL_LOOK_BACK:]]]), verbose=0
             )
             projected = np.append(projected, [local_pred[0][0]], axis=0)
+            print("local_pred:", local_pred)
+            print("projected[-MODEL_LOOK_BACK:]]:", projected[-MODEL_LOOK_BACK:])
 
     # Création des tableaux des projections (années et valeurs)
     years = range(
@@ -284,8 +287,8 @@ def model_get_forecast(df_emissions_weighted_avg_yearly, year_from, year_to):
     ]
 
     # Affiche le graphique des données d'origine et de prédiction
-    # colors = ['b', 'g', 'r', 'k', 'm', 'c', 'y']
-    # plt.plot(years[:len(dataset)], dataset, colors[0], label="Original")
+    colors = ["b", "g", "r", "k", "m", "c", "y"]
+    # plt.plot(years[: len(dataset)], dataset, colors[0], label="Original")
     # plt.plot(projected_years, projected_values, colors[1], label="Projected prediction")
     # plt.xlim(years[0] - 1, years[-1] + 1)
     # plt.show()
@@ -311,14 +314,12 @@ def get_forecast(year_from, year_to):
 
 
 if __name__ == "__main__":
-    print(get_forecast(2025, 2025))
-    exit(1)
+    # print(get_forecast(2025, 2025))
+    # exit(1)
     df_energy_sources = data_retrieve()
 
     if df_energy_sources is not None:
-        # print("df_energy_sources:\n", df_energy_sources)
         df_emissions_weighted_avg_yearly = data_prepare(df_energy_sources)
-        # print("df_emissions_weighted_avg_yearly:\n", df_emissions_weighted_avg_yearly)
 
         # print("\n--- ENTRAINEMENT DU MODELE ---")
         forecast = model_train(df_emissions_weighted_avg_yearly, 15)

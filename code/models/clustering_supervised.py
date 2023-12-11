@@ -7,292 +7,21 @@ from math import sqrt
 from os.path import abspath, dirname
 from plotly.subplots import make_subplots
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+from sklearn.metrics import (
+    classification_report,
+    confusion_matrix,
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score,
+)
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelEncoder
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
-from helpers.db_pg2 import pg2_cursor
 
-
-def run_decision_tree():
-    pg2_cursor.execute(
-        "SELECT DISTINCT ON (Country, Energy, PowerRelative, Date) Country, Energy, PowerRelative, Date FROM co2_energy_sources WHERE substr(date,0,5)>'2005' AND substr(date,0,5) NOT IN('2009','2014','2019') AND Energy IN('Biofuels', 'Hydro', 'Nuclear') ORDER BY Country, Energy, Date;"
-    )
-    df_energy_sources_train = pd.DataFrame(
-        pg2_cursor.fetchall(), columns=["Country", "Energy", "PowerRelative", "Date"]
-    )
-    print(df_energy_sources_train)
-    pg2_cursor.execute(
-        "SELECT DISTINCT ON (Country, Energy, PowerRelative, Date) Country, Energy, PowerRelative, Date FROM co2_energy_sources WHERE substr(date,0,5) IN ('2009','2014','2019') AND Energy IN('Biofuels', 'Hydro', 'Nuclear') ORDER BY Country, Energy, Date;"
-    )
-    df_energy_sources_test = pd.DataFrame(
-        pg2_cursor.fetchall(), columns=["Country", "Energy", "PowerRelative", "Date"]
-    )
-    print(df_energy_sources_test)
-
-    energy_encoder = LabelEncoder()
-    df_energy_sources_train["Energy"] = energy_encoder.fit_transform(
-        df_energy_sources_train["Energy"]
-    )
-    df_energy_sources_test["Energy"] = energy_encoder.transform(
-        df_energy_sources_test["Energy"]
-    )
-
-    country_encoder = LabelEncoder()
-    df_energy_sources_train["Country"] = country_encoder.fit_transform(
-        df_energy_sources_train["Country"]
-    )
-    df_energy_sources_test["Country"] = country_encoder.transform(
-        df_energy_sources_test["Country"]
-    )
-
-    X_train = df_energy_sources_train[["Energy", "PowerRelative", "Date"]]
-    X_test = df_energy_sources_test[["Energy", "PowerRelative", "Date"]]
-    y_train = df_energy_sources_train["Country"]
-    y_test = df_energy_sources_test["Country"]
-
-    print("X_train:", X_train)
-    print("y_train:", y_train)
-    print("X_test:", X_test)
-    print("y_test:", y_test)
-
-    tree = DecisionTreeClassifier(criterion="entropy", random_state=33)
-    tree.fit(X_train, y_train)
-
-    print("Feature importances: {}".format(tree.feature_importances_))
-
-    print(f"Accuracy on the training subset: {tree.score(X_train, y_train):.3f}")
-    print(f"Accuracy on the test subset: {tree.score(X_test, y_test):.3f}")
-
-    y_pred_train = tree.predict(X_train)
-    y_pred_test = tree.predict(X_test)
-
-    print("y_pred_train:", y_pred_train)
-    print("y_pred_test:", y_pred_test)
-
-
-def run_knn():
-    pg2_cursor.execute(
-        "SELECT DISTINCT ON (Country, Energy, PowerRelative, Date) Country, Energy, PowerRelative, Date FROM co2_energy_sources WHERE substr(date,0,5)>'2005' AND substr(date,0,5) NOT IN('2009','2014','2019') AND Energy IN('Biofuels', 'Hydro', 'Nuclear') ORDER BY Country, Energy, Date;"
-    )
-    # 'Biofuels', 'Hydro', 'Natural gas', 'Oil', 'Solar PC', 'Waste', 'Wind', 'Nuclear'
-    df_energy_sources_train = pd.DataFrame(
-        pg2_cursor.fetchall(), columns=["Country", "Energy", "PowerRelative", "Date"]
-    )
-    print(df_energy_sources_train)
-    pg2_cursor.execute(
-        "SELECT DISTINCT ON (Country, Energy, PowerRelative, Date) Country, Energy, PowerRelative, Date FROM co2_energy_sources WHERE substr(date,0,5) IN ('2009','2014','2019') AND Energy IN('Biofuels', 'Hydro', 'Nuclear') ORDER BY Country, Energy, Date;"
-    )
-    df_energy_sources_test = pd.DataFrame(
-        pg2_cursor.fetchall(), columns=["Country", "Energy", "PowerRelative", "Date"]
-    )
-    print(df_energy_sources_test)
-
-    energy_encoder = LabelEncoder()
-    df_energy_sources_train["Energy"] = energy_encoder.fit_transform(
-        df_energy_sources_train["Energy"]
-    )
-    df_energy_sources_test["Energy"] = energy_encoder.transform(
-        df_energy_sources_test["Energy"]
-    )
-
-    country_encoder = LabelEncoder()
-    df_energy_sources_train["Country"] = country_encoder.fit_transform(
-        df_energy_sources_train["Country"]
-    )
-    df_energy_sources_test["Country"] = country_encoder.transform(
-        df_energy_sources_test["Country"]
-    )
-
-    X_train = df_energy_sources_train[["Energy", "PowerRelative", "Date"]]
-    X_test = df_energy_sources_test[["Energy", "PowerRelative", "Date"]]
-    y_train = df_energy_sources_train["Country"]
-    y_test = df_energy_sources_test["Country"]
-
-    print("X_train:", X_train)
-    print("y_train:", y_train)
-    print("X_test:", X_test)
-    print("y_test:", y_test)
-
-    knn = KNeighborsClassifier(n_neighbors=3, p=1)
-    # , weights="distance"
-    knn.fit(X_train, y_train)
-
-    print(f"Accuracy on the training subset: {knn.score(X_train, y_train):.3f}")
-    print(f"Accuracy on the test subset: {knn.score(X_test, y_test):.3f}")
-
-    y_pred_train = knn.predict(X_train)
-    y_pred_test = knn.predict(X_test)
-
-    print("y_pred_train:", y_pred_train)
-    print("y_pred_test:", y_pred_test)
-
-
-def run_random_forest():
-    pg2_cursor.execute(
-        "SELECT DISTINCT ON (Country, Energy, PowerRelative, Date) Country, Energy, PowerRelative, Date FROM co2_energy_sources WHERE substr(date,0,5)>'2005' AND substr(date,0,5) NOT IN('2009','2014','2019') AND Energy IN('Biofuels', 'Hydro', 'Nuclear') ORDER BY Country, Energy, Date;"
-    )
-    df_energy_sources_train = pd.DataFrame(
-        pg2_cursor.fetchall(), columns=["Country", "Energy", "PowerRelative", "Date"]
-    )
-    print(df_energy_sources_train)
-    pg2_cursor.execute(
-        "SELECT DISTINCT ON (Country, Energy, PowerRelative, Date) Country, Energy, PowerRelative, Date FROM co2_energy_sources WHERE substr(date,0,5) IN ('2009','2014','2019') AND Energy IN('Biofuels', 'Hydro', 'Nuclear') ORDER BY Country, Energy, Date;"
-    )
-    df_energy_sources_test = pd.DataFrame(
-        pg2_cursor.fetchall(), columns=["Country", "Energy", "PowerRelative", "Date"]
-    )
-    print(df_energy_sources_test)
-
-    fig = px.scatter(
-        df_energy_sources_train, x="Country", y="PowerRelative", color="Energy"
-    )
-    fig.show()
-
-    energy_encoder = LabelEncoder()
-    df_energy_sources_train["Energy"] = energy_encoder.fit_transform(
-        df_energy_sources_train["Energy"]
-    )
-    df_energy_sources_test["Energy"] = energy_encoder.transform(
-        df_energy_sources_test["Energy"]
-    )
-
-    country_encoder = LabelEncoder()
-    df_energy_sources_train["Country"] = country_encoder.fit_transform(
-        df_energy_sources_train["Country"]
-    )
-    df_energy_sources_test["Country"] = country_encoder.transform(
-        df_energy_sources_test["Country"]
-    )
-
-    X_train = df_energy_sources_train[["Energy", "PowerRelative", "Date"]]
-    X_test = df_energy_sources_test[["Energy", "PowerRelative", "Date"]]
-    y_train = df_energy_sources_train["Country"]
-    y_test = df_energy_sources_test["Country"]
-
-    print("X_train:", X_train)
-    print("y_train:", y_train)
-    print("X_test:", X_test)
-    print("y_test:", y_test)
-
-    forest = RandomForestClassifier(
-        n_estimators=100,
-        criterion="entropy",
-        max_features=None,
-        bootstrap=False,
-        random_state=33,
-    )
-    forest.fit(X_train, y_train)
-
-    print(f"Accuracy on the training subset: {forest.score(X_train, y_train):.3f}")
-    print(f"Accuracy on the test subset: {forest.score(X_test, y_test):.3f}")
-
-    fig = px.bar(
-        x=X_train.columns,
-        y=forest.feature_importances_,
-        labels={"x": "Caractéristiques", "y": "Degré d'importance"},
-    )
-    fig.update_layout(
-        {
-            "title": {
-                "text": "Importance des fonctionnalités",
-                "x": 0.5,
-                "xanchor": "center",
-                "yanchor": "top",
-                "font": {"size": 20},
-            }
-        }
-    )
-    fig.show()
-
-    y_pred_train = forest.predict(X_train)
-    y_pred_test = forest.predict(X_test)
-
-    print("y_pred_train:", y_pred_train)
-    print("y_pred_test:", y_pred_test)
-
-
-def run_svm():
-    pg2_cursor.execute(
-        "SELECT DISTINCT ON (Country, Energy, PowerRelative, Date) Country, Energy, PowerRelative, Date FROM co2_energy_sources WHERE substr(date,0,5)>'2005' AND substr(date,0,5) NOT IN('2009','2014','2019') AND Energy IN('Biofuels', 'Hydro', 'Nuclear') ORDER BY Country, Energy, Date;"
-    )
-    # 'Biofuels', 'Hydro', 'Natural gas', 'Oil', 'Solar PC', 'Waste', 'Wind', 'Nuclear'
-    df_energy_sources_train = pd.DataFrame(
-        pg2_cursor.fetchall(), columns=["Country", "Energy", "PowerRelative", "Date"]
-    )
-    print(df_energy_sources_train)
-    pg2_cursor.execute(
-        "SELECT DISTINCT ON (Country, Energy, PowerRelative, Date) Country, Energy, PowerRelative, Date FROM co2_energy_sources WHERE substr(date,0,5) IN ('2009','2014','2019') AND Energy IN('Biofuels', 'Hydro', 'Nuclear') ORDER BY Country, Energy, Date;"
-    )
-    df_energy_sources_test = pd.DataFrame(
-        pg2_cursor.fetchall(), columns=["Country", "Energy", "PowerRelative", "Date"]
-    )
-    print(df_energy_sources_test)
-
-    fig = px.scatter(
-        df_energy_sources_train, x="Country", y="PowerRelative", color="Energy"
-    )
-    # fig = px.line(df_energy_sources, x="Country", y="PowerRelative", color="Energy")
-    fig.show()
-
-    """pg2_cursor.execute(
-        "SELECT DISTINCT ON (Date, Energy, PowerRelative) Energy, PowerRelative, Date FROM co2_energy_sources WHERE Country='BE' ORDER BY Energy, Date;"
-    )
-    df_energy_sources = pd.DataFrame(
-        pg2_cursor.fetchall(), columns=["Energy", "PowerRelative", "Date"]
-    )
-    print(df_energy_sources)
-
-    # fig = px.scatter(df_energy_sources, x="Date", y="PowerRelative", color="Energy")
-    fig = px.line(df_energy_sources, x="Date", y="PowerRelative", color="Energy")
-    fig.show()"""
-
-    df_energy_sources_train_bk = df_energy_sources_train.copy()
-    df_energy_sources_test_bk = df_energy_sources_test.copy()
-
-    energy_encoder = LabelEncoder()
-    df_energy_sources_train["Energy"] = energy_encoder.fit_transform(
-        df_energy_sources_train["Energy"]
-    )
-    df_energy_sources_test["Energy"] = energy_encoder.transform(
-        df_energy_sources_test["Energy"]
-    )
-
-    country_encoder = LabelEncoder()
-    df_energy_sources_train["Country"] = country_encoder.fit_transform(
-        df_energy_sources_train["Country"]
-    )
-    df_energy_sources_test["Country"] = country_encoder.transform(
-        df_energy_sources_test["Country"]
-    )
-
-    X_train = df_energy_sources_train[["Energy", "PowerRelative", "Date"]]
-    X_test = df_energy_sources_test[["Energy", "PowerRelative", "Date"]]
-    y_train = df_energy_sources_train["Country"]
-    y_test = df_energy_sources_test["Country"]
-
-    print("X_train:", X_train)
-    print("y_train:", y_train)
-    print("X_test:", X_test)
-    print("y_test:", y_test)
-
-    svm = SVC(C=5)
-    svm.fit(X_train, y_train)
-
-    print(f"Accuracy on the training subset: {svm.score(X_train, y_train):.3f}")
-    print(f"Accuracy on the test subset: {svm.score(X_test, y_test):.3f}")
-
-    y_pred_train = svm.predict(X_train)
-    y_pred_test = svm.predict(X_test)
-
-    print("y_pred_train:", y_pred_train)
-    print("y_pred_test:", y_pred_test)
-
-
-def run_benchmark(df, X_cols, y_col, training_ratio):
+def get_best_model(df, X_cols, y_col, training_ratio):
     classifiers = {
         "Decision tree": DecisionTreeClassifier(criterion="gini", max_depth=None),
         "Gaussian Naive Bayes": GaussianNB(),
@@ -371,44 +100,27 @@ def run_benchmark(df, X_cols, y_col, training_ratio):
             ignore_index=True,
         )
 
-    """for name, model in classifiers.items():
-        if name != "Abre de décision":
-            y_train_ready = np.reshape(y_train.values, -1)
-            y_test_ready = np.reshape(y_test.values, -1)
-        else:
-            y_train_ready = y_train.copy()
-            y_test_ready = y_test.copy()
-        model.fit(X_train, y_train_ready)
-        y_pred_train = model.predict(X_train)
-        y_pred_test = model.predict(X_test)
-
-        r2_train = round(r2_score(y_train_ready, y_pred_train) * 100, 2)
-        r2_test = round(r2_score(y_test_ready, y_pred_test) * 100, 2)
-        mae_train = round(mean_absolute_error(y_train_ready, y_pred_train), 2)
-        mae_test = round(mean_absolute_error(y_test_ready, y_pred_test), 2)
-        rmse_train = round(sqrt(mean_squared_error(y_train_ready, y_pred_train)), 2)
-        rmse_test = round(sqrt(mean_squared_error(y_test_ready, y_pred_test)), 2)
-        if rmse_train + rmse_test < rmse_train_min + rmse_test_min:
-            rmse_train_min = rmse_train
-            rmse_test_min = rmse_test
-            best_model = name
-        model_result = {
-            "model": name,
-            "r2_train": r2_train,
-            "r2_test": r2_test,
-            "mae_train": mae_train,
-            "mae_test": mae_test,
-            "rmse_train": rmse_train,
-            "rmse_test": rmse_test,
-        }
-
-        df_classifiers_benchmark = pd.concat(
-            [df_classifiers_benchmark, pd.DataFrame(model_result, index=[name])],
-            ignore_index=True,
-        )"""
-
     print(df_classifiers_benchmark)
-    print(f"Le meilleur modèle est : {best_model}")
+    print(f"Le meilleur modèle semble être : {best_model}")
+
+    # Calcule la matrice de confusion pour l'ensemble de test avec le meilleur modèle
+    y_pred_test = classifiers[best_model].predict(X_test)
+    conf_matrix = confusion_matrix(y_test, y_pred_test)
+
+    # Affiche la matrice de confusion sous forme de heatmap
+    fig = px.imshow(conf_matrix, text_auto=True)
+    fig.update_layout(
+        title_text=f"Matrice de confusion pour {best_model}",
+        title_x=0.5,
+        title_font={"size": 20},
+    )
+    fig.show()
+
+    # Affiche le raport de classification
+    print(
+        "Rapport de classification:",
+        classification_report(y_test, y_pred_test, zero_division=1),
+    )
 
     return classifiers[best_model]
 
@@ -429,8 +141,6 @@ def get_data(augmented_data=False):
 
     if augmented_data is True:
         # Source : généré manuellement
-        # Continent, Latitude, Longitude
-        # Country, Latitude, Longitude, Continent
         df_augmented = pd.read_csv(base_dir + "augmented_position.csv")
 
         df_augmented["Longitude"] = df_augmented["Longitude"].astype(str)
@@ -456,35 +166,36 @@ def get_data(augmented_data=False):
     return df_world, label_encoder
 
 
-def generate_guess_set():
-    # Europe 40,-10;70,40
-    guess_set = [
-        (random.randrange(40, 70), random.randrange(-10, 40)) for i in range(100)
-    ]
-    # Afrique -18,-15;34,33
-    guess_set += [
-        (random.randrange(-18, 34), random.randrange(-15, 33)) for i in range(100)
-    ]
-    # Asie 13,44;71,170
-    guess_set += [
-        (random.randrange(13, 71), random.randrange(44, 170)) for i in range(100)
-    ]
-    # Amérique du Nord 13,-123;62,-57
-    guess_set += [
-        (random.randrange(13, 62), random.randrange(-123, -57)) for i in range(100)
-    ]
-    # Amérique du Sud -56,-83;6,-33
-    guess_set += [
-        (random.randrange(-56, 6), random.randrange(-83, -33)) for i in range(100)
-    ]
-    # Océanie -52,106;-14,170
-    guess_set += [
-        (random.randrange(-52, -14), random.randrange(106, 170)) for i in range(100)
-    ]
-
-    guess_set = [
-        (random.randrange(-90, 90), random.randrange(-180, 180)) for i in range(500)
-    ]
+def generate_guess_set(continents=False):
+    if continents is True:
+        # Europe 40,-10;70,40
+        guess_set = [
+            (random.randrange(40, 70), random.randrange(-10, 40)) for i in range(100)
+        ]
+        # Afrique -18,-15;34,33
+        guess_set += [
+            (random.randrange(-18, 34), random.randrange(-15, 33)) for i in range(100)
+        ]
+        # Asie 13,44;71,170
+        guess_set += [
+            (random.randrange(13, 71), random.randrange(44, 170)) for i in range(100)
+        ]
+        # Amérique du Nord 13,-123;62,-57
+        guess_set += [
+            (random.randrange(13, 62), random.randrange(-123, -57)) for i in range(100)
+        ]
+        # Amérique du Sud -56,-83;6,-33
+        guess_set += [
+            (random.randrange(-56, 6), random.randrange(-83, -33)) for i in range(100)
+        ]
+        # Océanie -52,106;-14,170
+        guess_set += [
+            (random.randrange(-52, -14), random.randrange(106, 170)) for i in range(100)
+        ]
+    else:
+        guess_set = [
+            (random.randrange(-90, 90), random.randrange(-180, 180)) for i in range(500)
+        ]
 
     return pd.DataFrame(
         guess_set,
@@ -501,7 +212,6 @@ def get_predictions(df, X, model, label_encoder):
     y_test = df.loc[train_size:, ["Continent encodé"]].values
     y_test = np.reshape(y_test, -1)
 
-    # model = GradientBoostingClassifier(n_estimators=10, random_state=33)
     model.fit(X_train, y_train)
     y_pred_train = model.predict(X_train)
     y_pred_test = model.predict(X_test)
@@ -543,12 +253,12 @@ if __name__ == "__main__":
 
     guess_set = generate_guess_set()
 
-    model = run_benchmark(
+    model = get_best_model(
         df_world, ["Latitude", "Longitude"], ["Continent encodé"], 0.7
     )
     df_predictions = get_predictions(df_world, guess_set, model, label_encoder)
 
-    model_augmented = run_benchmark(
+    model_augmented = get_best_model(
         df_world_augmented, ["Latitude", "Longitude"], ["Continent encodé"], 0.7
     )
     df_predictions_augmented = get_predictions(
@@ -568,9 +278,6 @@ if __name__ == "__main__":
         },
     ]
 
-    # fig = px.scatter(df_world, x="Longitude", y="Latitude", color="Continent")
-    # fig = px.line(df_world, x="Longitude", y="Latitude", color="Continent")
-    # fig = px.density_contour(df_world, x="Longitude", y="Latitude", color="Continent")
     fig = make_subplots(
         rows=2,
         cols=2,
@@ -602,5 +309,3 @@ if __name__ == "__main__":
         title_font={"size": 20},
     )
     fig.show()
-
-    # print(df_world_augmented[df_world_augmented["Continent"] == "Here"])

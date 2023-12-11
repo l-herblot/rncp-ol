@@ -52,4 +52,4 @@ EXPOSE 8000
 EXPOSE 80
 
 # Run the application
-CMD ["sh", "-c", "cd web && flask run --host=0.0.0.0 --port 80 & cd api && uvicorn main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "cd api && uvicorn main:app --host 0.0.0.0 --port 8000 & cd web && flask run --host=0.0.0.0 --port 80"]

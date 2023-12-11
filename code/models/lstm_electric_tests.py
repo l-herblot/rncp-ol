@@ -14,6 +14,7 @@ import plotly.express as px
 import plotly.io as pio
 
 # Model
+from scipy.stats import pearsonr
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler
 from sklearn.linear_model import ElasticNet, LinearRegression
@@ -73,9 +74,7 @@ def data_prepare(df_energy_sources):
         )
 
     # Crée un DataFrame à partir du tableau
-    df_emissions_weighted_avg_yearly = pd.DataFrame(
-        emissions_weighted_avg_yearly
-    )
+    df_emissions_weighted_avg_yearly = pd.DataFrame(emissions_weighted_avg_yearly)
     # Tri le DataFrame par ordre croissant des années
     df_emissions_weighted_avg_yearly.sort_values(by=["year"], inplace=True)
 
@@ -122,7 +121,8 @@ def model_get_forecast(
     MODEL_TRAINING_RATIO = 0.73
 
     PG_TABLE_MODELS = "models_tuning3"
-    pg2_cursor.execute(f"""CREATE TABLE IF NOT EXISTS {PG_TABLE_MODELS}
+    pg2_cursor.execute(
+        f"""CREATE TABLE IF NOT EXISTS {PG_TABLE_MODELS}
       (
         ID SERIAL NOT NULL,
         TrainingRatio FLOAT NOT NULL,
@@ -139,30 +139,39 @@ def model_get_forecast(
         Projection TEXT,
         Duration FLOAT,
         CONSTRAINT {PG_TABLE_MODELS}_pk PRIMARY KEY(ID)
-      );""")
+      );"""
+    )
     pg2_conn.commit()
 
     test_params = {
-        "epochs": [30, 50, 100], #[30, 50, 100, 150, 250],
-        "batch_size": [1, 3, 5, 10, 15], #[1, 2, 3, 5, 8, 10, 15, 20, 30],
-        "training_ratio": [.7], #[.67, .73, .8],
-        "look_back": [3, 6, 9], #[1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "epochs": [30, 50, 100],  # [30, 50, 100, 150, 250],
+        "batch_size": [1, 3, 5, 10, 15],  # [1, 2, 3, 5, 8, 10, 15, 20, 30],
+        "training_ratio": [0.7],  # [.67, .73, .8],
+        "look_back": [3, 6, 9],  # [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         "hidden_layers": [32, 48, 64, 96, 128],
-        "activation_function": ["relu"], #["relu", "sigmoid", "tanh"],
-        "optimizer": ["adam", "nadam", "rmsprop"], #["adam", "nadam", "rmsprop", "sgd"],
-        "learning_rate": [.01, .001, .0001], #[.1, .01, .001, .0001],
-        "loss_function": ["mean_squared_error"],  # ["mean_absolute_error", "mean_squared_error"]
+        "activation_function": ["relu"],  # ["relu", "sigmoid", "tanh"],
+        "optimizer": [
+            "adam",
+            "nadam",
+            "rmsprop",
+        ],  # ["adam", "nadam", "rmsprop", "sgd"],
+        "learning_rate": [0.01, 0.001, 0.0001],  # [.1, .01, .001, .0001],
+        "loss_function": [
+            "mean_squared_error"
+        ],  # ["mean_absolute_error", "mean_squared_error"]
     }
     test_params = {
-        "epochs": [200], #[30, 50, 100, 150, 250],
-        "batch_size": [1], #[1, 2, 3, 5, 8, 10, 15, 20, 30],
-        "training_ratio": [.7], #[.67, .73, .8],
-        "look_back": [6], #[1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        "epochs": [200],  # [30, 50, 100, 150, 250],
+        "batch_size": [1],  # [1, 2, 3, 5, 8, 10, 15, 20, 30],
+        "training_ratio": [0.7],  # [.67, .73, .8],
+        "look_back": [6],  # [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         "hidden_layers": [128],
-        "activation_function": ["relu"], #["relu", "sigmoid", "tanh"],
-        "optimizer": ["nadam"], #["adam", "nadam", "rmsprop", "sgd"],
-        "learning_rate": [.0001], #[.1, .01, .001, .0001],
-        "loss_function": ["mean_squared_error"],  # ["mean_absolute_error", "mean_squared_error"]
+        "activation_function": ["relu"],  # ["relu", "sigmoid", "tanh"],
+        "optimizer": ["nadam"],  # ["adam", "nadam", "rmsprop", "sgd"],
+        "learning_rate": [0.0001],  # [.1, .01, .001, .0001],
+        "loss_function": [
+            "mean_squared_error"
+        ],  # ["mean_absolute_error", "mean_squared_error"]
     }
 
     result_dict = {}
@@ -199,35 +208,55 @@ def model_get_forecast(
 
     test_rmse = 15
     while test_rmse > 4.5:
-        for MODEL_EPOCHS in test_params['epochs']:
-            for MODEL_BATCH_SIZE in test_params['batch_size']:
-                for MODEL_TRAINING_RATIO in test_params['training_ratio']:
-                    for MODEL_LOOK_BACK in test_params['look_back']:
-                        for MODEL_HIDDEN_LAYERS in test_params['hidden_layers']:
-                            for MODEL_ACTIVATION_FUNCTION in test_params['activation_function']:
-                                for MODEL_OPTIMIZER in test_params['optimizer']:
-                                    for MODEL_LEARNING_RATE in test_params['learning_rate']:
-                                        for MODEL_LOSS_FUNCTION in test_params['loss_function']:
-                                        #test_rmse = 15
-                                        #while test_rmse > 3.8:
+        for MODEL_EPOCHS in test_params["epochs"]:
+            for MODEL_BATCH_SIZE in test_params["batch_size"]:
+                for MODEL_TRAINING_RATIO in test_params["training_ratio"]:
+                    for MODEL_LOOK_BACK in test_params["look_back"]:
+                        for MODEL_HIDDEN_LAYERS in test_params["hidden_layers"]:
+                            for MODEL_ACTIVATION_FUNCTION in test_params[
+                                "activation_function"
+                            ]:
+                                for MODEL_OPTIMIZER in test_params["optimizer"]:
+                                    for MODEL_LEARNING_RATE in test_params[
+                                        "learning_rate"
+                                    ]:
+                                        for MODEL_LOSS_FUNCTION in test_params[
+                                            "loss_function"
+                                        ]:
+                                            # test_rmse = 15
+                                            # while test_rmse > 3.8:
                                             iteration_start_time = time.time()
                                             iteration += 1
                                             if iteration > 1:
-                                                time_per_iteration = (time.time() - start_time) / iteration
+                                                time_per_iteration = (
+                                                    time.time() - start_time
+                                                ) / iteration
                                                 print(
-                                                    f"Iteration #{iteration}/{nb_experiments} ({iteration / nb_experiments * 100:.1f}%). ETR: {round((nb_experiments - iteration) * time_per_iteration)}s")
+                                                    f"Iteration #{iteration}/{nb_experiments} ({iteration / nb_experiments * 100:.1f}%). ETR: {round((nb_experiments - iteration) * time_per_iteration)}s"
+                                                )
 
-                                            tf_windows = tf_dataset.window(MODEL_LOOK_BACK+1, shift=1)
+                                            tf_windows = tf_dataset.window(
+                                                MODEL_LOOK_BACK + 1, shift=1
+                                            )
 
                                             def windowded_to_batch(sub):
-                                                return sub.batch(MODEL_LOOK_BACK+1, drop_remainder=True)
+                                                return sub.batch(
+                                                    MODEL_LOOK_BACK + 1,
+                                                    drop_remainder=True,
+                                                )
 
-                                            dataset_windowed = tf_windows.flat_map(windowded_to_batch).take(len(dataset))
-                                            train_size = round(len(dataset)*MODEL_TRAINING_RATIO)
+                                            dataset_windowed = tf_windows.flat_map(
+                                                windowded_to_batch
+                                            ).take(len(dataset))
+                                            train_size = round(
+                                                len(dataset) * MODEL_TRAINING_RATIO
+                                            )
                                             train = []
                                             test = []
-                                            for index, series in enumerate(dataset_windowed):
-                                                if index < train_size-MODEL_LOOK_BACK:
+                                            for index, series in enumerate(
+                                                dataset_windowed
+                                            ):
+                                                if index < train_size - MODEL_LOOK_BACK:
                                                     train.append(series.numpy())
                                                 else:
                                                     test.append(series.numpy())
@@ -235,36 +264,86 @@ def model_get_forecast(
                                             train = np.array(train)
                                             test = np.array(test)
 
-                                            train_X, train_y = train[:, :-1], train[:, -1]
+                                            train_X, train_y = (
+                                                train[:, :-1],
+                                                train[:, -1],
+                                            )
                                             test_X, test_y = test[:, :-1], test[:, -1]
 
-                                            train_X = train_X.reshape((train_X.shape[0], 1, train_X.shape[1]))
-                                            test_X = test_X.reshape((test_X.shape[0], 1, test_X.shape[1]))
+                                            train_X = train_X.reshape(
+                                                (train_X.shape[0], 1, train_X.shape[1])
+                                            )
+                                            test_X = test_X.reshape(
+                                                (test_X.shape[0], 1, test_X.shape[1])
+                                            )
 
-                                            input_tensor = Input(shape=(train_X.shape[1], train_X.shape[2]))
-                                            lstm_layer = LSTM(MODEL_HIDDEN_LAYERS, activation=MODEL_ACTIVATION_FUNCTION)(input_tensor)
+                                            input_tensor = Input(
+                                                shape=(
+                                                    train_X.shape[1],
+                                                    train_X.shape[2],
+                                                )
+                                            )
+                                            lstm_layer = LSTM(
+                                                MODEL_HIDDEN_LAYERS,
+                                                activation=MODEL_ACTIVATION_FUNCTION,
+                                            )(input_tensor)
                                             output_tensor = Dense(1)(lstm_layer)
                                             model = Model(input_tensor, output_tensor)
                                             match MODEL_OPTIMIZER:
                                                 case "nadam":
-                                                    m_optimizer = Nadam(learning_rate=MODEL_LEARNING_RATE)
+                                                    m_optimizer = Nadam(
+                                                        learning_rate=MODEL_LEARNING_RATE
+                                                    )
                                                 case "rmsprop":
-                                                    m_optimizer = RMSprop(learning_rate=MODEL_LEARNING_RATE)
+                                                    m_optimizer = RMSprop(
+                                                        learning_rate=MODEL_LEARNING_RATE
+                                                    )
                                                 case "sgd":
-                                                    m_optimizer = SGD(learning_rate=MODEL_LEARNING_RATE)
+                                                    m_optimizer = SGD(
+                                                        learning_rate=MODEL_LEARNING_RATE
+                                                    )
                                                 case _:
-                                                    m_optimizer = Adam(learning_rate=MODEL_LEARNING_RATE)
-                                            model.compile(loss=MODEL_LOSS_FUNCTION, optimizer=m_optimizer)
+                                                    m_optimizer = Adam(
+                                                        learning_rate=MODEL_LEARNING_RATE
+                                                    )
+                                            model.compile(
+                                                loss=MODEL_LOSS_FUNCTION,
+                                                optimizer=m_optimizer,
+                                            )
 
-                                            history = model.fit(train_X, train_y, epochs=MODEL_EPOCHS, batch_size=MODEL_BATCH_SIZE, validation_data=(test_X, test_y), verbose=0, shuffle=False)
-                                            #plt.plot(history.history['loss'], label='train')
-                                            #plt.plot(history.history['val_loss'], label='test')
-                                            #plt.legend()
-                                            #plt.show()
+                                            history = model.fit(
+                                                train_X,
+                                                train_y,
+                                                epochs=MODEL_EPOCHS,
+                                                batch_size=MODEL_BATCH_SIZE,
+                                                validation_data=(test_X, test_y),
+                                                verbose=0,
+                                                shuffle=False,
+                                            )
+                                            # plt.plot(history.history['loss'], label='train')
+                                            # plt.plot(history.history['val_loss'], label='test')
+                                            # plt.legend()
+                                            # plt.show()
 
-                                            train_pred = model.predict(train_X, verbose=0)
-                                            train_X = train_X.reshape((train_X.shape[0], train_X.shape[2]))
-                                            train_pred = np.concatenate((train_X, train_pred), axis=1)
+                                            train_pred = model.predict(
+                                                train_X, verbose=0
+                                            )
+                                            print("train_pred:", train_pred)
+                                            print("train_y:", train_y)
+                                            # Calculer le coefficient de corrélation de Pearson
+                                            correlation_coefficient, _ = pearsonr(
+                                                train_y, train_pred.flatten()
+                                            )
+                                            print(
+                                                "correlation_coefficient:",
+                                                correlation_coefficient,
+                                            )
+                                            train_X = train_X.reshape(
+                                                (train_X.shape[0], train_X.shape[2])
+                                            )
+                                            train_pred = np.concatenate(
+                                                (train_X, train_pred), axis=1
+                                            )
                                             """print("***train_pred", train_pred)
                                             # Shift inv_train_pred one step to the left to "sync" predictions with actual values and round years
                                             train_pred_length = len(train_pred)
@@ -273,43 +352,74 @@ def model_get_forecast(
                                             print("###train_pred", train_pred)"""
 
                                             train_y = train_y.reshape((len(train_y), 1))
-                                            train = np.concatenate((train_X, train_y), axis=1)
+                                            train = np.concatenate(
+                                                (train_X, train_y), axis=1
+                                            )
 
                                             test_pred = model.predict(test_X, verbose=0)
-                                            test_X = test_X.reshape((test_X.shape[0], test_X.shape[2]))
-                                            test_pred = np.concatenate((test_X, test_pred), axis=1)
+                                            test_X = test_X.reshape(
+                                                (test_X.shape[0], test_X.shape[2])
+                                            )
+                                            test_pred = np.concatenate(
+                                                (test_X, test_pred), axis=1
+                                            )
                                             test_pred_length = len(test_pred)
                                             for index in range(test_pred_length):
-                                                test_pred[index][0] = round(test_pred[index][0])
+                                                test_pred[index][0] = round(
+                                                    test_pred[index][0]
+                                                )
                                                 if index < test_pred_length - 1:
-                                                    test_pred[index][1] = test_pred[index+1][1]
+                                                    test_pred[index][1] = test_pred[
+                                                        index + 1
+                                                    ][1]
 
                                             test_y = test_y.reshape((len(test_y), 1))
-                                            inv_test = np.concatenate((test_X, test_y), axis=1)
+                                            inv_test = np.concatenate(
+                                                (test_X, test_y), axis=1
+                                            )
 
                                             PROJ_NB_YEARS = 15
                                             PROJ_LOOK_BACK = 10
                                             projected = dataset[-PROJ_LOOK_BACK:]
-                                            for i in range(1, PROJ_NB_YEARS+1):
-                                                local_pred = model.predict(np.array([[projected[-MODEL_LOOK_BACK:]]]), verbose=0)
-                                                projected = np.append(projected, [local_pred[0][0]], axis=0)
+                                            for i in range(1, PROJ_NB_YEARS + 1):
+                                                local_pred = model.predict(
+                                                    np.array(
+                                                        [[projected[-MODEL_LOOK_BACK:]]]
+                                                    ),
+                                                    verbose=0,
+                                                )
+                                                projected = np.append(
+                                                    projected,
+                                                    [local_pred[0][0]],
+                                                    axis=0,
+                                                )
                                                 if i <= PROJ_LOOK_BACK:
                                                     projected = projected[1:]
 
-                                            #colors = ['b','g','r','k','m','c','y']
-                                            years=range(df_emissions_weighted_avg_yearly['year'].values[0], df_emissions_weighted_avg_yearly['year'].values[-1]+PROJ_NB_YEARS)
-                                            #plt.plot(years[:-PROJ_NB_YEARS+1], dataset, colors[0], label="Original")
-                                            #plt.plot(df_emissions_weighted_avg_yearly['year'].values[MODEL_LOOK_BACK-1:train_size-1], train_pred[:,-1], colors[1], label="Train prediction")
-                                            #plt.plot(df_emissions_weighted_avg_yearly['year'].values[train_size-1:-1], test_pred[:,-1], colors[2], label="Test prediction")
-                                            #plt.plot(years[-PROJ_NB_YEARS:], projected, colors[3], "Projected prediction")
-                                            #plt.xlim(years[0]-1, years[-1]+PROJ_NB_YEARS+1)
-                                            #plt.show()
+                                            # colors = ['b','g','r','k','m','c','y']
+                                            years = range(
+                                                df_emissions_weighted_avg_yearly[
+                                                    "year"
+                                                ].values[0],
+                                                df_emissions_weighted_avg_yearly[
+                                                    "year"
+                                                ].values[-1]
+                                                + PROJ_NB_YEARS,
+                                            )
+                                            # plt.plot(years[:-PROJ_NB_YEARS+1], dataset, colors[0], label="Original")
+                                            # plt.plot(df_emissions_weighted_avg_yearly['year'].values[MODEL_LOOK_BACK-1:train_size-1], train_pred[:,-1], colors[1], label="Train prediction")
+                                            # plt.plot(df_emissions_weighted_avg_yearly['year'].values[train_size-1:-1], test_pred[:,-1], colors[2], label="Test prediction")
+                                            # plt.plot(years[-PROJ_NB_YEARS:], projected, colors[3], "Projected prediction")
+                                            # plt.xlim(years[0]-1, years[-1]+PROJ_NB_YEARS+1)
+                                            # plt.show()
 
-                                            print(f"For {MODEL_EPOCHS} epochs, a training ratio of {MODEL_TRAINING_RATIO*100}%, a look back of {MODEL_LOOK_BACK} and a batch size of {MODEL_BATCH_SIZE}, with {MODEL_HIDDEN_LAYERS} layers, {MODEL_ACTIVATION_FUNCTION} as activation method and {MODEL_OPTIMIZER}({MODEL_LEARNING_RATE}) :")
-                                            #print("train:", train[:, -1])
-                                            #print("train_pred:", train_pred[:, -1])
-                                            #print("test:", test[:, -1])
-                                            #print("test_pred:", test_pred[:, -1])
+                                            print(
+                                                f"For {MODEL_EPOCHS} epochs, a training ratio of {MODEL_TRAINING_RATIO*100}%, a look back of {MODEL_LOOK_BACK} and a batch size of {MODEL_BATCH_SIZE}, with {MODEL_HIDDEN_LAYERS} layers, {MODEL_ACTIVATION_FUNCTION} as activation method and {MODEL_OPTIMIZER}({MODEL_LEARNING_RATE}) :"
+                                            )
+                                            # print("train:", train[:, -1])
+                                            # print("train_pred:", train_pred[:, -1])
+                                            # print("test:", test[:, -1])
+                                            # print("test_pred:", test_pred[:, -1])
                                             if True in np.isnan(train_pred[:, -1]):
                                                 print("!!!")
                                                 print("!!!NAN IN TRAIN_PRED")
@@ -319,15 +429,29 @@ def model_get_forecast(
                                                 print("!!!NAN IN TEST_PRED")
                                                 print("!!!")
                                             else:
-                                                train_rmse = sqrt(mean_squared_error(train[:-1, -1], train_pred[1:, -1]))
-                                                test_rmse = sqrt(mean_squared_error(test[:-1, -1], test_pred[1:, -1]))
-                                                iteration_duration = time.time()-iteration_start_time
-                                                print(f"Train RMSE = {train_rmse:.3f}; Test RMSE = {test_rmse:.3f}; Training and prediction took {iteration_duration} seconds")
+                                                train_rmse = sqrt(
+                                                    mean_squared_error(
+                                                        train[:-1, -1],
+                                                        train_pred[1:, -1],
+                                                    )
+                                                )
+                                                test_rmse = sqrt(
+                                                    mean_squared_error(
+                                                        test[:-1, -1], test_pred[1:, -1]
+                                                    )
+                                                )
+                                                iteration_duration = (
+                                                    time.time() - iteration_start_time
+                                                )
+                                                print(
+                                                    f"Train RMSE = {train_rmse:.3f}; Test RMSE = {test_rmse:.3f}; Training and prediction took {iteration_duration} seconds"
+                                                )
 
                                                 projection = ""
                                                 for i, p in enumerate(projected):
                                                     projection += f"{years[-PROJ_NB_YEARS+i]+1}={p}; "
-                                                pg2_cursor.execute(f"""INSERT INTO {PG_TABLE_MODELS}
+                                                pg2_cursor.execute(
+                                                    f"""INSERT INTO {PG_TABLE_MODELS}
                                                     (TrainingRatio, LookBack, Epochs, BatchSize, HiddenLayers, ActivationFunction, Optimizer, LearningRate, LossFunction, TrainLoss, TestLoss, Projection, Duration)
                                                     VALUES (
                                                         {MODEL_TRAINING_RATIO},
@@ -342,7 +466,8 @@ def model_get_forecast(
                                                         {train_rmse:.3f},
                                                         {test_rmse:.3f},
                                                         '{projection}',
-                                                        {iteration_duration:.2f});""")
+                                                        {iteration_duration:.2f});"""
+                                                )
                                                 pg2_conn.commit()
 
                                                 if test_rmse <= 4:
@@ -366,15 +491,31 @@ def model_get_forecast(
         if test_rmse <= 4:
             break
 
-    colors = ['b','g','r','k','m','c','y']
-    plt.plot(years[:-PROJ_NB_YEARS+1], dataset, colors[0], label="Original")
-    plt.plot(df_emissions_weighted_avg_yearly['year'].values[MODEL_LOOK_BACK-1:train_size-1], train_pred[:,-1], colors[1], label="Train prediction")
-    plt.plot(df_emissions_weighted_avg_yearly['year'].values[train_size-1:-1], test_pred[:,-1], colors[2], label="Test prediction")
+    colors = ["b", "g", "r", "k", "m", "c", "y"]
+    plt.plot(years[: -PROJ_NB_YEARS + 1], dataset, colors[0], label="Original")
+    plt.plot(
+        df_emissions_weighted_avg_yearly["year"].values[
+            MODEL_LOOK_BACK - 1 : train_size - 1
+        ],
+        train_pred[:, -1],
+        colors[1],
+        label="Train prediction",
+    )
+    plt.plot(
+        df_emissions_weighted_avg_yearly["year"].values[train_size - 1 : -1],
+        test_pred[:, -1],
+        colors[2],
+        label="Test prediction",
+    )
     plt.plot(years[-PROJ_NB_YEARS:], projected, colors[3], "Projected prediction")
-    plt.xlim(years[0]-1, years[-1]+PROJ_NB_YEARS+1)
+    plt.xlim(years[0] - 1, years[-1] + PROJ_NB_YEARS + 1)
     plt.show()
-    model.save(f"lstm_electric_{MODEL_EPOCHS}_{MODEL_BATCH_SIZE}_{MODEL_TRAINING_RATIO*10**4}_{MODEL_LOOK_BACK}_{MODEL_HIDDEN_LAYERS}_{MODEL_OPTIMIZER}.keras")
-    model.save(f"lstm_electric_{MODEL_EPOCHS}_{MODEL_BATCH_SIZE}_{MODEL_TRAINING_RATIO*10**4}_{MODEL_LOOK_BACK}_{MODEL_HIDDEN_LAYERS}_{MODEL_OPTIMIZER}.h5")
+    model.save(
+        f"lstm_electric_{MODEL_EPOCHS}_{MODEL_BATCH_SIZE}_{MODEL_TRAINING_RATIO*10**4}_{MODEL_LOOK_BACK}_{MODEL_HIDDEN_LAYERS}_{MODEL_OPTIMIZER}.keras"
+    )
+    model.save(
+        f"lstm_electric_{MODEL_EPOCHS}_{MODEL_BATCH_SIZE}_{MODEL_TRAINING_RATIO*10**4}_{MODEL_LOOK_BACK}_{MODEL_HIDDEN_LAYERS}_{MODEL_OPTIMIZER}.h5"
+    )
     pg2_conn.close()
 
     """def splitter(batch):
@@ -527,9 +668,7 @@ def model_get_forecast(
     return result_dict
 
 
-def series_to_supervised(
-    data, n_in=1, n_out=1, n_still=0, dropnan=False, fillnan=None
-):
+def series_to_supervised(data, n_in=1, n_out=1, n_still=0, dropnan=False, fillnan=None):
     """
     Frame a time series as a supervised learning dataset.
     Arguments:
