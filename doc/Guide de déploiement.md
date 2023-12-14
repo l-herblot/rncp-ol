@@ -5,25 +5,6 @@ Une application permettant de consulter des données sur les émissions de GES d
 - une API
 - une interface web
 
-## Environnement de développement
-### Installation des dépendances
-```bash
-python.exe -m pip install --upgrade pip
-pip install -r requirements-dev.txt
-```
-
-## Exécution de l'API et du serveur web
-### Exécution de l'API
-```bash
-cd api
-uvicorn main:app --reload
-```
-### Exécution du serveur web
-```bash
-cd web
-flask run
-```
-
 ## Déploiement de l'application
 ### Création de l'image Docker
 ```bash
