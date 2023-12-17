@@ -26,13 +26,17 @@ from time import time, time_ns
 from config.settings import settings
 from helpers.db_pg2 import pg2_conn, pg2_cursor
 
-# Ignore les avertissements indiquant que le modèle n'a pas pu converger
+# Ignore les avertissements indiquant que le modèle n'a pas pu converger notamment
 ignore_warnings(category=ConvergenceWarning)
 ignore_warnings(category=RuntimeWarning)
 ignore_warnings(category=UserWarning)
 
 
 def create_logging_table():
+    """
+    Crée la table de log pour comparer les performances des modèles
+    :return:
+    """
     global pg2_conn, pg2_cursor
 
     pg2_cursor.execute(
@@ -64,7 +68,8 @@ def test_model(
     :param query_select: la nature des échantillons à récupérer dans la base de données
     :param query_where: la partie conditions de la requête de récupération des échantillons dans la base de données
     :param num_samples: le nombre maximum d'échantillons à récupérer dans la base de données, ou 0 pour toutes les valeurs disponibles
-    :return:
+    :param model_type: le type de modèle à tester
+    :return: accuracy, f1-score
     """
     # Récupération des échantillons dans la base de données
     pg2_cursor.execute(
@@ -122,7 +127,6 @@ def test_model(
     if model_type in [
         "AffinityPropagation",
         "BIRCH",
-        "GaussianMixture",
         "KMeans",
         "MiniBatchKMeans",
     ]:
@@ -137,6 +141,7 @@ def test_model(
     elif model_type in [
         "AgglomerativeClustering",
         "DBSCAN",
+        "GaussianMixture",
         "MeanShift",
         "OPTICS",
         "SpectralClustering",
@@ -147,6 +152,7 @@ def test_model(
     # Calcul du temps écoulé pour l'entraînement du modèle
     duration = (time_ns() - time_start) / 10**9
 
+    # Génèration du rapport de classification
     report = classification_report(
         model_input.iloc[:, model_input.columns.get_loc(model_input.columns[-1])],
         out,
@@ -163,7 +169,7 @@ def test_model(
         report["weighted avg"],
     )
 
-    # Récupération des clusters
+    # Récupération des classes
     clusters = unique(out)
 
     plot_filename = (
@@ -184,7 +190,7 @@ def test_model(
     columns.append("out")
     df_plot_ready.columns = columns
 
-    # Affichage du graphique
+    # Affichage du graphique en nuage de points
     fig = px.scatter(
         data_frame=df_plot_ready,
         x=features[0],
@@ -204,16 +210,16 @@ def test_model(
 #
 def plot_against(query):
     """
-    Affiche un graphique de données réelles de la base de données à des fins comparatives
+    Affiche un graphique des données réelles de la base de données à des fins comparatives
     :param query: la requête SQL de récupération des données à afficher dans le graphique
     :return:
     """
     global pg2_cursor
 
+    # Récupération des données et population des ensembles d'entrée (X) et de sortie (y)
     pg2_cursor.execute(query)
     X = []
     y = []
-
     features = query[len("SELECT ") - 1 : query.find("FROM")].split(",")
     for r in pg2_cursor.fetchall():
         X.append([r[f] for f in range(len(features) - 1)])
@@ -221,7 +227,7 @@ def plot_against(query):
     X = pd.DataFrame(X).fillna(0)
     out = np.array(y)
 
-    # Création du nuage de points
+    # Affichage du graphique en nuage de points
     fig = px.scatter(
         x=X[0],
         y=X[1],
@@ -262,7 +268,7 @@ def run_tests(model_list, query_select, query_where, query_plot_against):
     plot_against(query_plot_against)
 
     print(
-        f"Le meilleur modèle semble être {best_model} avec une exactitude de {accuracy}"
+        f"Le meilleur modèle semble être {best_model} avec un f1-score de {max_f1_score}"
     )
 
 
@@ -307,17 +313,8 @@ def run_gm_co2e_ec_mro():
     print(
         f"{error_count} prédictions erronnées ont été trouvées, soit un ratio de {error_count/len(df_plot_ready)*100:.2f}%"
     )
+
     # Préparation de la zone de graphique (contenant deux graphiques)
-    """fig = make_subplots(
-        rows=2,
-        cols=2,
-        specs=[[{}, {}], [{"colspan": 2}, None]],
-        subplot_titles=[
-            "GaussianMixture avec CO2e+EC (vs MRO)",
-            "CO2e+EC vs MRO 2",
-            "Exactitude des prédictions",
-        ],
-    )"""
     fig = make_subplots(
         rows=1,
         cols=2,
@@ -355,7 +352,7 @@ def run_gm_co2e_ec_mro():
         col=2,
     )
 
-    # Affiche la figure (avec les deux graphiques)
+    # Affichage de la figure (avec les deux graphiques)
     fig.show()
 
     # Affichage du troisième graphique (échec ou succès des prédictions)
@@ -433,29 +430,19 @@ test_model_list = [
     },
 ]
 
-# test_model_list = []
-
-"""test_model_list = [
-    {
-        "model": "GaussianMixture",
-        "params": {"n_components": 2},
-        "max_samples": 0,
-    },
-]"""
-
 label_encoders = {}
 
 if __name__ == "__main__":
     create_logging_table()
 
-    """run_tests(
+    run_tests(
         test_model_list,
         "CO2e, EC, (CASE WHEN MRO<1500 THEN 0 ELSE 1 END) Masse",
         "CO2e IS NOT NULL AND EC IS NOT NULL AND (MRO<1500 OR MRO>2500)",
         f"SELECT CO2e, EC, (CASE WHEN MRO<1500 THEN 0 ELSE 1 END) Masse FROM {settings['PG_TABLE_VEHICLES']} WHERE CO2e IS NOT NULL AND EC IS NOT NULL AND (MRO<1500 OR MRO>2500);",
-    )"""
+    )
     # f"SELECT CO2e, EC, Make FROM {settings['PG_TABLE_VEHICLES']} WHERE EC IS NOT NULL AND EC>0 AND Make IN('MERCEDES-BENZ', 'VOLKSWAGEN', 'BMW', 'AUDI', 'FORD', 'RENAULT', 'SKODA', 'SEAT', 'OPEL', 'PEUGEOT')"
     # f"SELECT CO2e, EC, (CASE WHEN MRO<1000 THEN 'A' WHEN MRO<1500 THEN 'B' WHEN MRO>2500 THEN 'E' END) Mass FROM {settings['PG_TABLE_VEHICLES']} WHERE EC IS NOT NULL AND EC>0 AND (MRO<1500 OR MRO>2500)"
     # f"SELECT CO2e, MRO, (CASE WHEN EC<1000 THEN 'A' WHEN EC<1500 THEN 'B' WHEN EC<2000 THEN 'C' WHEN EC <2500 THEN 'D' ELSE 'E' END) capacity FROM {settings['PG_TABLE_VEHICLES']}_thermal WHERE CO2e IS NOT NULL AND MRO IS NOT NULL AND CO2e>100"
 
-    run_gm_co2e_ec_mro()
+    # run_gm_co2e_ec_mro()

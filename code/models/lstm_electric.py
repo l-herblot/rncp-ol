@@ -5,7 +5,6 @@ import pandas as pd
 import time
 
 from math import sqrt
-from scipy.stats import pearsonr
 from sklearn.metrics import mean_squared_error
 from helpers.db_pg2 import *
 
@@ -33,11 +32,16 @@ MODEL_LEARNING_RATE = 0.0001
 MODEL_LOOK_BACK = 6
 MODEL_TRAINING_RATIO = 0.7
 # Définition des autres paramètres liés au modèle
-MODEL_TARGET_RMSE = 45
+MODEL_TARGET_RMSE = 4.5
 MODEL_PATH = "../data/models/lstm_electric.h5"
 
 
 def data_prepare(df_energy_sources):
+    """
+    Retourne le dataframe fourni augmenté de la moyenne pondérée des émissions de GES
+    :param df_energy_sources: le dataframe des sources d'énergie primaire
+    :return: le datframe augmenté
+    """
     # Récupère les années uniques
     energy_sources_years_unique = df_energy_sources["date"].str[:4].unique()
 
@@ -70,6 +74,10 @@ def data_prepare(df_energy_sources):
 
 
 def data_retrieve():
+    """
+    Retourne un dataframe contenant les informations des sources d'énergie primaire
+    :return: le dataframe des sources d'énergie primaire
+    """
     global pg2_cursor
 
     if pg2_cursor is None:
@@ -92,6 +100,12 @@ def data_retrieve():
 
 
 def model_train(df_emissions_weighted_avg_yearly, proj_nb_years=15):
+    """
+    Entraîne le modèle de prédiction du mix électrique
+    :param df_emissions_weighted_avg_yearly: le dataframe contenant l'historique du mix électrique
+    :param proj_nb_years: le nombre d'années à prédire
+    :return: un dictionnaire contenant les prédictions par année
+    """
     # Création d'un dataset des valeurs d'émissions
     dataset = df_emissions_weighted_avg_yearly["co2e_weighted_avg"].values
     # Conversion en dataset Tensorflow
@@ -236,6 +250,13 @@ def model_train(df_emissions_weighted_avg_yearly, proj_nb_years=15):
 
 
 def model_get_forecast(df_emissions_weighted_avg_yearly, year_from, year_to):
+    """
+    Récupère les valeurs du mix électrique (dont éventuellement tout ou une partie prédite) pour la période demandée
+    :param df_emissions_weighted_avg_yearly: le dataframe contenant l'historique du mix électrique
+    :param year_from: l'année de début de la période
+    :param year_to: l'année de la fin de la période
+    :return: un dictionnaire contenant les prédictions par année
+    """
     # Création d'un dataset des valeurs d'émissions et d'un autre avec les années
     dataset = df_emissions_weighted_avg_yearly["co2e_weighted_avg"].values
     df_years = df_emissions_weighted_avg_yearly["year"].values
@@ -255,7 +276,6 @@ def model_get_forecast(df_emissions_weighted_avg_yearly, year_from, year_to):
         }
 
     # Vérification de l'existence du fichier contenant le modèle
-    # print(os.path.abspath(MODEL_PATH))
     if os.path.isfile(MODEL_PATH) is False:
         return {"error": "Le fichier de modèle entraîné n'existe pas"}
 
@@ -263,7 +283,7 @@ def model_get_forecast(df_emissions_weighted_avg_yearly, year_from, year_to):
     model = load_model(MODEL_PATH)
 
     # Construction du dataset de données d'entrée pour les projections
-    projected = dataset[:]  # [-MODEL_LOOK_BACK:]
+    projected = dataset[:]
 
     # Prédiction des projections (une année après l'autre puisque la prédiction pour une année est dépendante
     # des valeurs d'émissions des MODEL_LOOK_BACK années précédentes)
@@ -273,8 +293,6 @@ def model_get_forecast(df_emissions_weighted_avg_yearly, year_from, year_to):
                 np.array([[projected[-MODEL_LOOK_BACK:]]]), verbose=0
             )
             projected = np.append(projected, [local_pred[0][0]], axis=0)
-            print("local_pred:", local_pred)
-            print("projected[-MODEL_LOOK_BACK:]]:", projected[-MODEL_LOOK_BACK:])
 
     # Création des tableaux des projections (années et valeurs)
     years = range(
@@ -298,6 +316,13 @@ def model_get_forecast(df_emissions_weighted_avg_yearly, year_from, year_to):
 
 
 def get_forecast(year_from, year_to):
+    """
+    Fonction "autonome" appelée par l'API
+    Récupère les valeurs du mix électrique (dont éventuellement tout ou une partie prédite) pour la période demandée
+    :param year_from: l'année de début de la période
+    :param year_to: l'année de la fin de la période
+    :return: un dictionnaire contenant les prédictions par année
+    """
     df_energy_sources = data_retrieve()
 
     if df_energy_sources is not None:
@@ -314,18 +339,16 @@ def get_forecast(year_from, year_to):
 
 
 if __name__ == "__main__":
-    # print(get_forecast(2025, 2025))
-    # exit(1)
     df_energy_sources = data_retrieve()
 
     if df_energy_sources is not None:
         df_emissions_weighted_avg_yearly = data_prepare(df_energy_sources)
 
-        # print("\n--- ENTRAINEMENT DU MODELE ---")
+        print("\n--- ENTRAINEMENT DU MODELE ---")
         forecast = model_train(df_emissions_weighted_avg_yearly, 15)
 
         print("\n--- RESULTATS DE LA PROJECTION ---")
-        # print(forecast)
-        # print(model_get_forecast(df_emissions_weighted_avg_yearly, 2024, 2036))
+        print(forecast)
+        print(model_get_forecast(df_emissions_weighted_avg_yearly, 2024, 2036))
 
     pg2_disconnect()

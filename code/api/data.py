@@ -68,6 +68,7 @@ async def retrieve_data(
                 return {
                     "error": "L'identifiant de l'appelant n'a pas été fourni ou n'est pas reconnu"
                 }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

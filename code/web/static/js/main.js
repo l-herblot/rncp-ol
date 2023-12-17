@@ -1,28 +1,40 @@
+// Création de la variable contenant le graphique des émissions, avec une portée globale
 let forecast_chart;
 
+/**
+ * Crée ou met à jour le graphique des émissions
+ * @param {float} co2e - Les émissions de GES pour la partie thermique du véhicule
+ * @param {float} z - La consommation électrique du véhicule
+ */
 function updateChart(co2e, z){
+    // Initialise les années de début et de fin de la période à afficher
     const year_from = document.getElementById("year").value;
     const year_to = new Date().getFullYear() + 15;
+    // Récupère les dimensions du graphique
     const chart_height = document.getElementById("chart-canvas").height;
     const chart_width = document.getElementById("chart-canvas").width;
+
+    // Affiche une animation de chargement
     document.getElementById("chart").innerHTML = '<div class="spinner-grow text-primary" role="status" height="' + chart_height + '" width="' + chart_width + '"><div class="sr-only"></div></div>'
+
+    // Récupère les données d'émissions auprès de l'API
     fetch("http://" + (server_ip_address != client_ip_address ? server_ip_address : "localhost") + ":8000/forecast?year_from=" + year_from + "&year_to=" + year_to,{
             headers : {'Content-Type': 'application/json', 'Accept': 'application/json'}
         })
         .then((response) => {
             if (!response.ok) {throw new Error('forecast@api a retourné une réponse non exploitable');}
-            const res = response.json();
-            return res;
+            return response.json();;
         })
         .then((json) => {
             let chart_labels = [];
             let chart_values = [];
-            console.log(co2e + ', ' + z)
-            // co2e in gCO2e/km, z in Wh/km and json[i] in gCO2e/KWh
+            // Création des données du graphique
+            // co2e en gCO2e/km, z en Wh/km et json[i] en gCO2e/KWh
             for (let i = year_from; i <= year_to; i++) {
                 chart_labels.push(i);
                 chart_values.push(co2e + (json[i] * z / 1000));
             }
+            // Crée le graphique
             document.getElementById("chart").innerHTML = '<canvas class="my-4 w-100" id="chart-canvas" width="800" height="300"></canvas>';
             if(chart_values.length>1){
                 if(forecast_chart){forecast_chart.destroy();}
@@ -56,12 +68,6 @@ function updateChart(co2e, z){
                                 boxPadding: 3
                             }
                         },
-                        /*scales: {
-                            y: {
-                                suggestedMin: 0,
-                                suggestedMax: 500
-                            }
-                        }*/
                     }
                 })
             }
@@ -69,7 +75,30 @@ function updateChart(co2e, z){
         .catch((error) => {console.error('updateChart a rencontré une erreur pour récupérer les données: ', error);});
 }
 
-function updateData(caller, from_onclick=false){
+/**
+ * Ajoute les différentes options dans une liste déroulante
+ * @param {Array} arr - Liste des options à ajouter
+ * @param {string} selectType - Type du select (identifiant de celui-ci)
+ * @param {Object} dict - (Optionnel) Dictionnaire permettant d'associer un texte à une valeur
+ */
+function populateSelect(arr, selectType, dict=null){
+    for (let i = 0; i < arr.length; i++) {
+        let elt = arr[i].toString();
+        if(elt.trim().length>1) {
+            let opt = document.createElement("option");
+            opt.textContent = dict?dict[elt]:elt;
+            opt.value = elt;
+            document.getElementById(selectType).appendChild(opt);
+        }
+    }
+}
+
+/**
+ * Met à jour les listes de recherche ou les informations sur le véhicule
+ * @param {string} caller - l'identifiant du contrôle qui a fait appel à la fonction
+ */
+function updateData(caller){
+    // Récupère les informations en appelant l'API
     fetch("http://" + (server_ip_address != client_ip_address ? server_ip_address : "localhost") + ":8000/data?caller=" + caller
         + "&country=" + document.getElementById("country").value
         + "&make=" + document.getElementById("make").value
@@ -80,8 +109,7 @@ function updateData(caller, from_onclick=false){
         })
         .then((response) => {
             if (!response.ok) {throw new Error('data@api a retourné une réponse non exploitable');}
-            const res = response.json();
-            return res;
+            return response.json();
         })
         .then((json) => {
             switch(caller){
@@ -90,56 +118,22 @@ function updateData(caller, from_onclick=false){
                     document.getElementById("cn").options.length = 0;
                     document.getElementById("ft").options.length = 0;
                     document.getElementById("year").options.length = 0;
-                    for (let i = 0; i < json.makes.length; i++) {
-                        let make = json.makes[i].toString();
-                        if(make.trim().length>1) {
-                            let opt = document.createElement("option");
-                            opt.textContent = make;
-                            opt.value = make;
-                            document.getElementById("make").appendChild(opt);
-                        }
-                    }
+                    populateSelect(json.makes, "make");
                     break;
                 case "make":
                     document.getElementById("cn").options.length = 0;
                     document.getElementById("ft").options.length = 0;
                     document.getElementById("year").options.length = 0;
-                    for (let i = 0; i < json.cns.length; i++) {
-                        let cn = json.cns[i].toString();
-                        if(cn.trim().length>1) {
-                            let opt = document.createElement("option");
-                            opt.textContent = cn;
-                            opt.value = cn;
-                            document.getElementById("cn").appendChild(opt);
-                        }
-                    }
+                    populateSelect(json.cns, "cn");
                     break;
                 case "cn":
                     document.getElementById("ft").options.length = 0;
                     document.getElementById("year").options.length = 0;
-                    for (let i = 0; i < json.fts.length; i++) {
-                        console.log(json.fts[i]);
-                        let ft = json.fts[i].toString();
-                        if(ft.trim().length>1) {
-                            let opt = document.createElement("option");
-                            opt.textContent = fuel_types_dict[ft];
-                            opt.value = ft;
-                            document.getElementById("ft").appendChild(opt);
-                        }
-                    }
+                    populateSelect(json.fts, "ft", fuel_types_dict);
                     break;
                 case "ft":
                     document.getElementById("year").options.length = 0;
-                    for (let i = 0; i < json.years.length; i++) {
-                        console.log(json.years[i]);
-                        let year = json.years[i].toString();
-                        if(year.trim().length>1) {
-                            let opt = document.createElement("option");
-                            opt.textContent = year;
-                            opt.value = year;
-                            document.getElementById("year").appendChild(opt);
-                        }
-                    }
+                    populateSelect(json.years, "year");
                     break;
                 case "year":
                     const vehicle = json.vehicle[0];
@@ -179,27 +173,30 @@ function updateData(caller, from_onclick=false){
         .catch((error) => {console.error('updateData a rencontré une erreur pour récupérer les données: ', error);});
 }
 
+/**
+ * Met à jour l'image miniature illustrant le véhicule'
+ */
 function updateThumbnail(){
     const make = document.getElementById("make").value;
     const cn = document.getElementById("cn").value;
     const year = document.getElementById("year").value;
+
+    // Affiche une animation de chargement
     document.getElementById("vehicle-thumbnail").innerHTML = '<div class="spinner-grow text-primary" role="status"><span class="sr-only"></span></div>'
+
+    // Récupère l'URL de la miniature auprès de l'API
     fetch("http://" + (server_ip_address != client_ip_address ? server_ip_address : "localhost") + ":8000/data/thumbnail?vehicle=" + make + " " + cn + " " + year,{
             headers : {'Content-Type': 'application/json', 'Accept': 'application/json'}
         })
         .then((response) => {
             if (!response.ok) {throw new Error('thumbnail@api a retourné une réponse non exploitable');}
-            const res = response.json();
-            return res;
+            return response.json();
         })
         .then((json) => {
             if(json.thumbnail_url.length > 0){
-                //document.getElementById("vehicle-thumbnail-img").src = json.thumbnail_url;
                 document.getElementById("vehicle-thumbnail").innerHTML = '<img id="vehicle-thumbnail-img" class="img-thumbnail rounded" src="' + json.thumbnail_url + '">';
             }
-            else{
-                console.log(json.error);
-            }
+            else{console.log(json.error);}
         })
         .catch((error) => {console.error('updateThumbnail a rencontré une erreur pour récupérer les données: ', error);});
 }

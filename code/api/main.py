@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+# S'assure que le chemin de la racine du projet soit bien dans le path (pour permettre l'import des modules)
 file = Path(__file__).resolve()
 sys.path.append(str(file.parents[1]))
 
@@ -12,6 +13,7 @@ from api.forecast_electric import router_forecast_electric
 
 from helpers.network import get_public_ip
 
+# Instancie l'application Fast API
 app = FastAPI(
     title="CO2 vehicles",
     description="CO2 vehicles vous informe sur les émissions des véhicules européens",
@@ -24,6 +26,8 @@ app = FastAPI(
     },
 )
 
+# Autorise diverses URL dans le cadre du CORS (Cross-Origin Resource Sharing)
+# Permet d'éviter le refus du serveur à répondre à une demande effectuée par un client local
 origins = [
     "http://localhost",
     "http://localhost:80",
@@ -35,7 +39,6 @@ origins = [
     f"http://{get_public_ip()}:80",
     f"http://{get_public_ip()}:5000",
 ]
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -44,11 +47,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Ajoute les différentes routes
 app.include_router(
     router_forecast_electric, prefix="/forecast", tags=["Forecast electric"]
 )
 app.include_router(router_data, prefix="/data", tags=["Data retrieval"])
 
+# Lance le serveur Uvicorn
 if __name__ == "__main__":
     import uvicorn
 

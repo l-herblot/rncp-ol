@@ -13,16 +13,8 @@ app = Flask("co2e")
 def index():
     if request.method == "POST":
         country = request.form.get("country")
-        make = request.form.get("make")
-        cn = request.form.get("cn")
-        fuel_type = request.form.get("ft")
-        year = request.form.get("year")
     else:
         country = request.args.get("country")
-        make = request.args.get("make")
-        cn = request.args.get("cn")
-        fuel_type = request.args.get("ft")
-        year = request.args.get("year")
 
     return render_template(
         "index.html",

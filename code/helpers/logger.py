@@ -154,5 +154,6 @@ def init_logging(level=logging.INFO):
     logger = get_logger(f"co2_{__name__}", "projet")
 
 
+# Initialize the logger object
 logger = None
 init_logging()
